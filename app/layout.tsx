@@ -7,14 +7,14 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
   openGraph: {
     title: "Life is a Gamble",
-    description: "Walk the ruins, pick your doors, and tempt Fate in downtown Syracuse.",
-    images: [{ url: "/og-v2.png", width: 1792, height: 1024, alt: "Life is a Gamble — Walk the Ruins. Pick Your Doors." }],
+    description: "Explore a dense modular post-apocalyptic city level in downtown Syracuse.",
+    images: [{ url: "/og-v3.png", width: 1792, height: 1024, alt: "Life is a Gamble — A City Built to Be Explored" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Life is a Gamble",
-    description: "Walk the ruins. Pick your doors.",
-    images: ["/og-v2.png"],
+    description: "A city built to be explored.",
+    images: ["/og-v3.png"],
   },
 };
 

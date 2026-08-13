@@ -67,6 +67,50 @@ function EnvSprite({ row, col, label, className = "", style }: { row: number; co
   return <div className={`env-sprite ${className}`} role="img" aria-label={label} style={{ ...style, backgroundPosition: `${col * 33.333}% ${row * 33.333}%` }} />;
 }
 
+function BuildingTile({ row, col, className = "" }: { row: number; col: number; className?: string }) {
+  return <div className={`building-tile ${className}`} style={{ backgroundPosition: `${col * 33.333}% ${row * 50}%` }} />;
+}
+
+type ModularBuildingProps = {
+  className: string;
+  name: string;
+  subtitle: string;
+  material: "brick" | "stone" | "metal";
+  floors: number;
+  bays: number;
+  door?: InteractionTarget;
+  doorBay?: number;
+  storefront?: boolean;
+  damaged?: boolean;
+  onInteract: (event: React.MouseEvent, target: InteractionTarget) => void;
+};
+
+function ModularBuilding({ className, name, subtitle, material, floors, bays, door, doorBay = 1, storefront = false, damaged = false, onInteract }: ModularBuildingProps) {
+  const materialRow = material === "stone" ? 1 : material === "metal" ? 2 : 0;
+  const cells = Array.from({ length: floors * bays }, (_, index) => {
+    const floor = Math.floor(index / bays);
+    const bay = index % bays;
+    const groundFloor = floor === floors - 1;
+    const isDoor = Boolean(door && groundFloor && bay === Math.min(doorBay, bays - 1));
+    let row = materialRow;
+    let col = 0;
+    if (material === "metal") col = 3;
+    else if (storefront && groundFloor && !isDoor) { row = 2; col = 1; }
+    else if (floor < floors - 1) col = damaged && (index + bay) % 5 === 0 ? 2 : material === "stone" && bay % 3 === 0 ? 2 : 1;
+    else col = bay % 2 === 0 ? 0 : 1;
+    if (isDoor) { row = 2; col = 0; }
+    const tile = <BuildingTile row={row} col={col} className={isDoor ? "door-tile" : ""} />;
+    return isDoor && door ? <button key={index} className="building-door-cell" onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}>{tile}</button> : <div key={index} className="building-cell">{tile}</div>;
+  });
+  return <section className={`modular-building ${className} ${material}`} style={{ "--bays": bays, "--floors": floors } as CSSProperties} onClick={(event) => event.stopPropagation()}>
+    <div className="building-roof"><BuildingTile row={2} col={2} /></div>
+    <div className="building-side">{Array.from({ length: floors }, (_, floor) => <BuildingTile key={floor} row={material === "stone" ? 1 : 0} col={0} />)}</div>
+    <div className="building-face">{cells}</div>
+    <div className="building-cornice"><BuildingTile row={material === "stone" ? 1 : 0} col={3} /></div>
+    <div className="building-sign"><strong>{name}</strong><small>{subtitle}</small></div>
+  </section>;
+}
+
 const interactions: Record<string, InteractionTarget> = {
   supplyDoor: { id: "supply-door", label: "Clinton Provisioners", kind: "door", locked: true, lockpick: true, interior: "Clinton Provisioners" },
   museumDoor: { id: "museum-door", label: "Erie Canal Museum Archive", kind: "door", interior: "Erie Canal Museum Archive" },
@@ -171,6 +215,16 @@ export default function Home() {
     if (!bounds) return;
     const x = Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100));
     const y = Math.max(30, Math.min(86, ((event.clientY - bounds.top) / bounds.height) * 100));
+    const blocked = [
+      { x1: 5, x2: 31, y1: 18, y2: 48 }, { x1: 67, x2: 94, y1: 16, y2: 48 },
+      { x1: 3, x2: 29, y1: 63, y2: 92 }, { x1: 67, x2: 96, y1: 64, y2: 94 },
+      { x1: 35, x2: 51, y1: 18, y2: 43 }, { x1: 51, x2: 64, y1: 69, y2: 92 },
+    ];
+    if (blocked.some((area) => x >= area.x1 && x <= area.x2 && y >= area.y1 && y <= area.y2)) {
+      addLog("That route is blocked by a building footprint.", "bad");
+      setContextMenu(null);
+      return;
+    }
     const distance = Math.hypot((x - playerPosition.x) * bounds.width / 100, (y - playerPosition.y) * bounds.height / 100);
     const duration = Math.max(240, Math.min(1700, distance * 3.5));
     setContextMenu(null);
@@ -444,48 +498,17 @@ export default function Home() {
           {!interior ? <>
             <div className="syracuse-skyline"><i /><i /><i /><i /><i /><i /></div>
             <div className="scene-title downtown-title"><small>DISTRICT LOADED · CLICK GROUND TO WALK</small><strong>DOWNTOWN SYRACUSE</strong><span>CLINTON SQUARE ↔ ARMORY SQUARE · 0.3 MI COMPRESSED</span></div>
-            <div className="map-reference">STREET PLAN · REAL-WORLD DOWNTOWN ANCHORS</div>
+            <div className="level-ground"><div className="block block-nw"/><div className="block block-ne"/><div className="block block-sw"/><div className="block block-se"/><div className="road road-east-west"><span>W FAYETTE STREET</span></div><div className="road road-north-south"><span>S SALINA STREET</span></div><div className="crosswalk cross-a"/><div className="crosswalk cross-b"/><div className="plaza-stone"><span>CLINTON SQUARE</span></div></div>
 
-            <div className="street erie"><span>ERIE BLVD W</span></div>
-            <div className="street salina"><span>S SALINA ST</span></div>
-            <div className="street franklin"><span>S FRANKLIN ST</span></div>
-            <div className="street fayette"><span>W FAYETTE ST</span></div>
-            <div className="street washington"><span>W WASHINGTON ST</span></div>
-            <EnvSprite row={0} col={1} label="Cracked downtown intersection" className="city-tile tile-intersection" />
-            <EnvSprite row={0} col={0} label="Cracked Erie Boulevard road tile" className="city-tile tile-road-a" />
-            <EnvSprite row={0} col={2} label="Broken sidewalk corner" className="city-tile tile-sidewalk" />
-            <EnvSprite row={0} col={3} label="Clinton Square brick plaza" className="city-tile tile-plaza" />
-
-            <div className="district-label clinton-label"><b>CLINTON SQUARE</b><small>MONUMENT BASIN</small></div>
-            <div className="district-label armory-label"><b>ARMORY SQUARE</b><small>CARAVAN MARKET</small></div>
-            <div className="district-label hanover-label"><b>HANOVER SQUARE</b><small>NEUTRAL BLOCK</small></div>
-
-            <div className="city-building canal-museum" onClick={(e) => e.stopPropagation()}>
-              <EnvSprite row={3} col={0} label="Canal-era warehouse facade" className="building-art" />
-              <div className="building-name"><small>318 ERIE BLVD E</small><b>ERIE CANAL MUSEUM</b><span>MEMORY EXCHANGE</span></div>
-              <button className="hotspot door museum-door" onClick={(e) => openInteraction(e, interactions.museumDoor)} onContextMenu={(e) => openInteraction(e, interactions.museumDoor)} aria-label="Interact with Erie Canal Museum archive door"><EnvSprite row={1} col={2} label="Museum archive door" /></button>
-            </div>
-
-            <div className="city-building city-hall" onClick={(e) => e.stopPropagation()}>
-              <EnvSprite row={1} col={1} label="Soot-stained civic limestone building" className="building-art civic-art" />
-              <div className="building-name"><small>E WASHINGTON + MONTGOMERY</small><b>SYRACUSE CITY HALL</b><span>FREE RECORDS ANNEX</span></div>
-              <button className="hotspot door hall-door" onClick={(e) => openInteraction(e, interactions.cityHallDoor)} onContextMenu={(e) => openInteraction(e, interactions.cityHallDoor)} aria-label="Interact with City Hall records annex door"><EnvSprite row={1} col={2} label="Locked City Hall door" /></button>
-            </div>
-
-            <div className="city-building landmark-theatre" onClick={(e) => e.stopPropagation()}>
-              <EnvSprite row={3} col={1} label="Ruined Landmark Theatre storefront" className="building-art theatre-art" />
-              <div className="marquee">LANDMARK</div>
-              <button className="hotspot door theater-door" onClick={(e) => openInteraction(e, interactions.theaterDoor)} onContextMenu={(e) => openInteraction(e, interactions.theaterDoor)} aria-label="Interact with inaccessible Landmark Theatre door"><EnvSprite row={1} col={3} label="Boarded theater door" /></button>
-            </div>
-
-            <div className="city-building provisioners" onClick={(e) => e.stopPropagation()}>
-              <EnvSprite row={1} col={0} label="Ruined red brick provisioner building" className="building-art shop-art" />
-              <div className="building-name"><small>S CLINTON + W FAYETTE</small><b>CLINTON PROVISIONERS</b><span>LOCKED · TRADE GOODS</span></div>
-              <button className="hotspot door supply-door" onClick={(e) => openInteraction(e, interactions.supplyDoor)} onContextMenu={(e) => openInteraction(e, interactions.supplyDoor)} aria-label="Interact with locked provisioner door"><EnvSprite row={1} col={2} label="Locked steel shop door" /></button>
-            </div>
+            <ModularBuilding className="build-canal" name="ERIE CANAL MUSEUM" subtitle="MEMORY EXCHANGE · OPEN" material="brick" floors={3} bays={4} door={interactions.museumDoor} doorBay={2} damaged onInteract={openInteraction} />
+            <ModularBuilding className="build-hall" name="CITY HALL ANNEX" subtitle="RECORDS OFFICE · LOCKED" material="stone" floors={4} bays={4} door={interactions.cityHallDoor} doorBay={1} onInteract={openInteraction} />
+            <ModularBuilding className="build-theatre" name="LANDMARK THEATRE" subtitle="STRUCTURE UNSAFE" material="brick" floors={3} bays={5} door={interactions.theaterDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
+            <ModularBuilding className="build-provisioners" name="CLINTON PROVISIONERS" subtitle="TRADE GOODS · LOCKED" material="brick" floors={2} bays={4} door={interactions.supplyDoor} doorBay={1} storefront onInteract={openInteraction} />
+            <ModularBuilding className="build-warehouse" name="ARMORY STORAGE" subtitle="NO REGISTERED TENANT" material="metal" floors={2} bays={4} damaged onInteract={openInteraction} />
+            <ModularBuilding className="build-rowhouse" name="HANOVER ROW" subtitle="RESIDENTIAL CLAIM" material="brick" floors={3} bays={3} damaged onInteract={openInteraction} />
 
             <button className="hotspot prop sedan-prop" onClick={(e) => openInteraction(e, interactions.sedan)} onContextMenu={(e) => openInteraction(e, interactions.sedan)} aria-label="Interact with abandoned sedan"><EnvSprite row={2} col={3} label="Rusted abandoned sedan" /></button>
-            <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with Erie Boulevard street lamp"><EnvSprite row={2} col={1} label="Bent street lamp" /></button>
+            <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with street lamp"><EnvSprite row={2} col={1} label="Bent street lamp" /></button>
             <EnvSprite row={2} col={2} label="Scrap checkpoint barricade" className="city-prop barricade-prop" />
             <EnvSprite row={3} col={2} label="Downtown rubble pile" className="city-prop rubble-prop" />
             <EnvSprite row={3} col={3} label="Dead tree planter" className="city-prop tree-prop" />
