@@ -40,6 +40,8 @@ const cities = [
   { name: "Watertown", x: 53, y: 26, kind: "city", detail: "Northwatch — the last warm stop before the old border." },
 ];
 
+const playableCity = "Syracuse";
+
 const initialSkills = { Guns: 3, Barter: 2, Speech: 3, Survival: 4, Medicine: 1, Mechanics: 2 };
 const reelSymbols = ["♠", "7", "☢", "♦", "★", "BAR"];
 
@@ -184,7 +186,7 @@ export default function Home() {
       if (save.skills) setSkills(save.skills);
       if (save.npc) setNpc(save.npc);
       if (save.worldFlags) setWorldFlags(save.worldFlags);
-      if (save.location && !String(save.location).includes("Salt Yard")) setLocation(save.location);
+      if (save.location && String(save.location).includes("Syracuse")) setLocation(save.location);
     } catch {
       // A damaged local save should never keep the player from starting.
     }
@@ -216,9 +218,8 @@ export default function Home() {
     const x = Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100));
     const y = Math.max(30, Math.min(86, ((event.clientY - bounds.top) / bounds.height) * 100));
     const blocked = [
-      { x1: 5, x2: 31, y1: 18, y2: 48 }, { x1: 67, x2: 94, y1: 16, y2: 48 },
-      { x1: 3, x2: 29, y1: 63, y2: 92 }, { x1: 67, x2: 96, y1: 64, y2: 94 },
-      { x1: 35, x2: 51, y1: 18, y2: 43 }, { x1: 51, x2: 64, y1: 69, y2: 92 },
+      { x1: 0, x2: 40, y1: 12, y2: 45 }, { x1: 66, x2: 100, y1: 12, y2: 45 },
+      { x1: 0, x2: 40, y1: 84, y2: 100 }, { x1: 66, x2: 100, y1: 84, y2: 100 },
     ];
     if (blocked.some((area) => x >= area.x1 && x <= area.x2 && y >= area.y1 && y <= area.y2)) {
       addLog("That route is blocked by a building footprint.", "bad");
@@ -393,17 +394,13 @@ export default function Home() {
   };
 
   const travel = async (place: (typeof cities)[number]) => {
-    if (place.kind === "citadel" && level < 4) {
-      addLog("Albany Citadel denies entry. Clearance requires Level 4.", "bad");
+    if (place.name !== playableCity) {
+      addLog(`${place.name} is outside the current playable build. Syracuse must be finished first.`, "bad");
       return;
     }
     setPanel(null);
-    const result = await spinFate("Road event");
-    setLocation(place.name);
-    if (result.jackpot) {
-      setWorldFlags((v) => [...new Set([...v, `Lucky cache found near ${place.name}`])]);
-      addLog(`A road cache turns up outside ${place.name}.`, "good");
-    } else addLog(`Traveled to ${place.name}. ${place.detail}`);
+    setLocation("Downtown Syracuse — Clinton Square");
+    addLog("Syracuse selected. All other routes remain closed while their districts are built.", "system");
   };
 
   const fallbackDialogue = (message: string, roll: number) => {
@@ -498,7 +495,16 @@ export default function Home() {
           {!interior ? <>
             <div className="syracuse-skyline"><i /><i /><i /><i /><i /><i /></div>
             <div className="scene-title downtown-title"><small>DISTRICT LOADED · CLICK GROUND TO WALK</small><strong>DOWNTOWN SYRACUSE</strong><span>CLINTON SQUARE ↔ ARMORY SQUARE · 0.3 MI COMPRESSED</span></div>
-            <div className="level-ground"><div className="block block-nw"/><div className="block block-ne"/><div className="block block-sw"/><div className="block block-se"/><div className="road road-east-west"><span>W FAYETTE STREET</span></div><div className="road road-north-south"><span>S SALINA STREET</span></div><div className="crosswalk cross-a"/><div className="crosswalk cross-b"/><div className="plaza-stone"><span>CLINTON SQUARE</span></div></div>
+            <div className="level-ground">
+              <div className="road road-east-west"><span>W FAYETTE STREET</span></div>
+              <div className="road road-north-south"><span>S SALINA STREET</span></div>
+              <div className="sidewalk sidewalk-north"/><div className="sidewalk sidewalk-south"/>
+              <div className="sidewalk sidewalk-west"/><div className="sidewalk sidewalk-east"/>
+              <div className="crosswalk cross-north"/><div className="crosswalk cross-south"/>
+              <div className="crosswalk cross-west"/><div className="crosswalk cross-east"/>
+              <div className="corner-plaza"><span>CLINTON SQUARE</span></div>
+              <div className="street-cracks"/><div className="drain drain-a"/><div className="drain drain-b"/>
+            </div>
 
             <ModularBuilding className="build-canal" name="ERIE CANAL MUSEUM" subtitle="MEMORY EXCHANGE · OPEN" material="brick" floors={3} bays={4} door={interactions.museumDoor} doorBay={2} damaged onInteract={openInteraction} />
             <ModularBuilding className="build-hall" name="CITY HALL ANNEX" subtitle="RECORDS OFFICE · LOCKED" material="stone" floors={4} bays={4} door={interactions.cityHallDoor} doorBay={1} onInteract={openInteraction} />
@@ -506,6 +512,10 @@ export default function Home() {
             <ModularBuilding className="build-provisioners" name="CLINTON PROVISIONERS" subtitle="TRADE GOODS · LOCKED" material="brick" floors={2} bays={4} door={interactions.supplyDoor} doorBay={1} storefront onInteract={openInteraction} />
             <ModularBuilding className="build-warehouse" name="ARMORY STORAGE" subtitle="NO REGISTERED TENANT" material="metal" floors={2} bays={4} damaged onInteract={openInteraction} />
             <ModularBuilding className="build-rowhouse" name="HANOVER ROW" subtitle="RESIDENTIAL CLAIM" material="brick" floors={3} bays={3} damaged onInteract={openInteraction} />
+            <ModularBuilding className="build-market" name="SALINA MARKET" subtitle="STALLS CLOSED AT DUSK" material="brick" floors={3} bays={5} storefront damaged onInteract={openInteraction} />
+            <ModularBuilding className="build-corner" name="CLINTON HOUSE" subtitle="ROOMS · WATER · RUMORS" material="brick" floors={4} bays={5} storefront onInteract={openInteraction} />
+            <ModularBuilding className="build-foundry" name="SALT CITY FOUNDRY" subtitle="SCRAP UNION LOCAL 8" material="metal" floors={3} bays={5} damaged onInteract={openInteraction} />
+            <ModularBuilding className="build-bank" name="ONONDAGA TRUST" subtitle="VAULT STATUS UNKNOWN" material="stone" floors={4} bays={4} damaged onInteract={openInteraction} />
 
             <button className="hotspot prop sedan-prop" onClick={(e) => openInteraction(e, interactions.sedan)} onContextMenu={(e) => openInteraction(e, interactions.sedan)} aria-label="Interact with abandoned sedan"><EnvSprite row={2} col={3} label="Rusted abandoned sedan" /></button>
             <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with street lamp"><EnvSprite row={2} col={1} label="Bent street lamp" /></button>
@@ -657,16 +667,17 @@ function Skills({ level, skills, points, upgrade }: { level: number; skills: typ
 }
 
 function WorldMap({ level, location, travel }: { level: number; location: string; travel: (place: (typeof cities)[number]) => void }) {
+  void level;
   const [hovered, setHovered] = useState(cities.find((c) => location.includes(c.name)) || cities[5]);
   return <div className="map-view">
     <div className="modal-head"><small>ROAD NETWORK 2186</small><h2>THE UPSTATE WASTES</h2><p>A compressed expedition map · routes redraw as the world changes.</p></div>
     <div className="map-paper">
       <div className="lake lake-erie">LAKE ERIE</div><div className="lake lake-ontario">LAKE ONTARIO</div>
       <div className="route r1" /><div className="route r2" /><div className="route r3" /><div className="route r4" /><div className="route r5" />
-      {cities.map((place) => <button key={place.name} className={`map-pin ${place.kind} ${location.includes(place.name) ? "here" : ""}`} style={{ left: `${place.x}%`, top: `${place.y}%` }} onMouseEnter={() => setHovered(place)} onFocus={() => setHovered(place)} onClick={() => travel(place)}><i />{place.name}<small>{place.kind === "citadel" && level < 4 ? "LOCKED · LVL 4" : place.kind.toUpperCase()}</small></button>)}
+      {cities.map((place) => <button key={place.name} className={`map-pin ${place.kind} ${location.includes(place.name) ? "here" : ""} ${place.name !== playableCity ? "disabled" : ""}`} style={{ left: `${place.x}%`, top: `${place.y}%` }} onMouseEnter={() => setHovered(place)} onFocus={() => setHovered(place)} onClick={() => travel(place)} aria-disabled={place.name !== playableCity}><i />{place.name}<small>{place.name !== playableCity ? "LOCKED · NOT BUILT" : "PLAYABLE DISTRICT"}</small></button>)}
       <div className="map-gridlines" />
     </div>
-    <div className="map-readout"><span>SELECTED DESTINATION</span><strong>{hovered.name}</strong><p>{hovered.detail}</p><em>{hovered.kind === "citadel" && level < 4 ? "Citadel access denied until Level 4" : "Click marker to travel · road event will test Fate"}</em></div>
+    <div className="map-readout"><span>SELECTED DESTINATION</span><strong>{hovered.name}</strong><p>{hovered.detail}</p><em>{hovered.name === playableCity ? "PLAYABLE NOW · Open downtown Syracuse" : "ROUTE DISABLED · This location unlocks after its game level is built"}</em></div>
   </div>;
 }
 

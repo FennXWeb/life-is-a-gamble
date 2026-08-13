@@ -267,3 +267,47 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .sedan-prop{right:34%;bottom:23%;width:88px;height:66px}.lamp-prop{left:39%;top:48%;width:46px;height:70px}.barricade-prop{width:72px;height:62px;left:57%;bottom:20%}.rubble-prop{width:70px;height:60px;right:29%;top:40%}.tree-prop{width:66px;height:78px;left:35%;top:37%}
 .downtown-player{z-index:30}.downtown-rowan,.downtown-squirrel{z-index:29}.downtown-rowan{left:39%;top:73%}.downtown-squirrel{left:61%;top:77%}.control-hint{z-index:35}
 @media(max-width:1100px){.modular-building{--cell-w:37px;--cell-h:36px}.modular-building.stone{--cell-w:38px;--cell-h:35px}.build-canal{left:3%}.build-hall{right:3%}.build-theatre{right:2%}.build-provisioners{left:2%}.building-sign strong{font-size:7px}}
+
+/* Syracuse authored level v3 — dense street canyon based on the concept art. */
+.city-scene{background:#171914!important;overflow:hidden;}
+.city-scene::before{z-index:0;background:radial-gradient(ellipse at 49% 34%,#d18c3d20,transparent 33%),linear-gradient(180deg,#6d4b2f 0 12%,#292921 13% 100%)!important;}
+.syracuse-skyline{top:0;height:20%;opacity:.7;filter:brightness(.45) drop-shadow(0 12px 8px #090a08);}
+.downtown-title{top:13px;left:20px}.map-reference{top:12px}
+.level-ground{inset:11% 0 0;background:#24251f;z-index:1;}
+.level-ground::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 0 46.5%,#151713 46.5% 59%,transparent 59%),linear-gradient(180deg,#423a2d 0 44%,#171a16 44% 69%,#39352d 69% 100%);}
+.level-ground::after{inset:0;background:radial-gradient(ellipse at 53% 57%,#77552c30,transparent 22%),repeating-linear-gradient(98deg,transparent 0 83px,#83715112 84px 85px),repeating-linear-gradient(2deg,transparent 0 57px,#0d0f0c38 58px 59px);}
+.block{display:none}
+.road{border-color:#5e513c;background:linear-gradient(90deg,#1b1e19,#2d2d27 48%,#1a1d18);box-shadow:inset 0 0 34px #080907;}
+.road::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(103deg,transparent 0 126px,#090a0870 127px 128px);opacity:.7}
+.road-east-west{left:-2%;right:-2%;top:54%;height:21%;border-width:3px 0;transform:rotate(-.35deg)}
+.road-east-west::after{left:0;right:0;top:50%;border-width:1px 0 0;border-color:#80683c99}
+.road-east-west span{left:13%;top:12px;color:#a4875080}
+.road-north-south{left:46.5%;top:10%;bottom:-4%;width:12.5%;border-width:0 3px;transform:skewY(-.5deg)}
+.road-north-south::after{top:0;bottom:0;left:50%;border-width:0 0 0 1px;border-color:#80683c99}
+.road-north-south span{left:-17px;top:70%}
+.sidewalk{position:absolute;z-index:3;background:repeating-linear-gradient(94deg,#625847 0 42px,#403d34 43px 44px);border:1px solid #77674c;box-shadow:inset 0 0 18px #181914;}
+.sidewalk-north{left:0;right:0;top:45%;height:9%}.sidewalk-south{left:0;right:0;top:75%;height:9%}
+.sidewalk-west{left:40%;top:10%;bottom:0;width:6.5%;background:repeating-linear-gradient(4deg,#625847 0 42px,#403d34 43px 44px)}
+.sidewalk-east{left:59%;top:10%;bottom:0;width:6%;background:repeating-linear-gradient(4deg,#625847 0 42px,#403d34 43px 44px)}
+.crosswalk{z-index:5;opacity:.55;background:repeating-linear-gradient(90deg,#b8aa8b 0 7px,transparent 8px 14px)}
+.cross-north,.cross-south{left:46.5%;width:12.5%;height:6%}.cross-north{top:48%}.cross-south{top:75%}
+.cross-west,.cross-east{top:54%;height:21%;width:5%;background:repeating-linear-gradient(0deg,#b8aa8b 0 7px,transparent 8px 14px)}.cross-west{left:41.5%}.cross-east{left:59%}
+.cross-a,.cross-b{display:none}
+.corner-plaza{position:absolute;z-index:4;left:27%;top:36%;width:13%;height:18%;transform:skewX(-7deg);border:1px solid #79694d;background:repeating-linear-gradient(45deg,#5b5140 0 5px,#49463b 6px 11px);box-shadow:inset 0 0 25px #191a15}
+.corner-plaza span{position:absolute;left:8px;bottom:6px;color:#b7965e99;font:700 6px monospace;letter-spacing:.13em}
+.street-cracks{position:absolute;z-index:3;left:7%;right:4%;top:56%;height:16%;opacity:.65;background:linear-gradient(17deg,transparent 0 36%,#090a08 36.2% 36.5%,transparent 36.8%),linear-gradient(-11deg,transparent 0 71%,#090a08 71.2% 71.5%,transparent 71.8%)}
+.drain{position:absolute;z-index:6;width:45px;height:13px;border:1px solid #111;background:repeating-linear-gradient(90deg,#111 0 3px,#49473d 4px 6px);transform:skewX(-20deg)}.drain-a{left:34%;top:76%}.drain-b{right:21%;top:52%}
+.plaza-stone{display:none}
+
+.modular-building{--cell-w:50px;--cell-h:48px;filter:drop-shadow(15px 20px 11px #050605);}
+.modular-building.stone{--cell-w:50px;--cell-h:48px}.modular-building.metal{--cell-w:48px;--cell-h:46px}
+.building-face{border-color:#171611;box-shadow:inset 0 0 22px #090a07}
+.building-side{right:-36px;width:37px;filter:brightness(.42)}
+.building-roof{left:16px;right:-23px;top:-30px;height:32px;filter:brightness(.55)}
+.building-cornice{height:17px}.building-sign{bottom:7px;background:#11130fee;}
+.build-bank{left:-4%;top:16%;z-index:13}.build-canal{left:8%;top:18%;z-index:14}.build-market{left:23%;top:20%;z-index:15}.build-corner{left:40%;top:14%;z-index:17}.build-hall{right:13%;top:16%;z-index:14}.build-warehouse{right:-2%;left:auto;top:25%;z-index:13;transform:none}
+.build-provisioners{left:-3%;bottom:-9%;z-index:18}.build-rowhouse{left:13%;right:auto;bottom:-13%;z-index:19;transform:none}.build-foundry{right:14%;bottom:-12%;z-index:19}.build-theatre{right:-3%;bottom:-9%;z-index:20}.build-corner::after{height:44%;right:-35%}
+.sedan-prop{right:29%;bottom:20%;width:112px;height:82px;z-index:23}.lamp-prop{left:38%;top:48%;width:50px;height:78px;z-index:24}.barricade-prop{left:60%;bottom:18%;width:88px;height:72px;z-index:22}.rubble-prop{right:7%;top:46%;width:84px;height:67px;z-index:22}.tree-prop{left:31%;top:38%;width:72px;height:90px;z-index:20}
+.downtown-rowan{left:38%;top:72%}.downtown-squirrel{left:66%;top:78%}
+.map-pin.disabled{filter:grayscale(1);opacity:.43;cursor:not-allowed;color:#332d24;text-shadow:none}.map-pin.disabled i{background:#3d3b35;box-shadow:none}.map-pin.disabled:hover{color:#332d24}.map-pin.disabled:hover i{background:#3d3b35;box-shadow:none}.map-pin.disabled small{color:#4b3028;font-weight:900}
+@media(max-width:1250px){.modular-building{--cell-w:43px;--cell-h:42px}.modular-building.stone{--cell-w:43px;--cell-h:42px}.modular-building.metal{--cell-w:42px;--cell-h:40px}.build-market{left:22%}.build-corner{left:39%}.build-hall{right:12%}}
