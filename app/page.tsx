@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 type Panel = "inventory" | "skills" | "map" | "dialogue" | "help" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
 type LogEntry = { id: number; tone: "system" | "good" | "bad" | "plain"; text: string };
+type InteractionTarget = {
+  id: string;
+  label: string;
+  kind: "door" | "prop";
+  locked?: boolean;
+  lockpick?: boolean;
+  inaccessible?: boolean;
+  interior?: string;
+  action?: "search" | "inspect";
+};
 type NpcState = {
   trust: number;
   respect: number;
@@ -52,13 +63,26 @@ function Sprite({ row, col, label, className = "" }: { row: number; col: number;
   );
 }
 
+function EnvSprite({ row, col, label, className = "", style }: { row: number; col: number; label: string; className?: string; style?: CSSProperties }) {
+  return <div className={`env-sprite ${className}`} role="img" aria-label={label} style={{ ...style, backgroundPosition: `${col * 33.333}% ${row * 33.333}%` }} />;
+}
+
+const interactions: Record<string, InteractionTarget> = {
+  supplyDoor: { id: "supply-door", label: "Clinton Provisioners", kind: "door", locked: true, lockpick: true, interior: "Clinton Provisioners" },
+  museumDoor: { id: "museum-door", label: "Erie Canal Museum Archive", kind: "door", interior: "Erie Canal Museum Archive" },
+  theaterDoor: { id: "theater-door", label: "Landmark Theatre Stage Door", kind: "door", inaccessible: true },
+  cityHallDoor: { id: "city-hall-door", label: "Syracuse City Hall Records Annex", kind: "door", locked: true, lockpick: true, interior: "City Hall Records Annex" },
+  sedan: { id: "rusted-sedan", label: "Abandoned Sedan", kind: "prop", action: "search" },
+  lamp: { id: "erie-lamp", label: "Erie Boulevard Street Lamp", kind: "prop", action: "inspect" },
+};
+
 function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
 export default function Home() {
   const [panel, setPanel] = useState<Panel>(null);
-  const [location, setLocation] = useState("Salt Yard, Syracuse");
+  const [location, setLocation] = useState("Downtown Syracuse — Clinton Square");
   const [hp, setHp] = useState(32);
   const [maxHp, setMaxHp] = useState(32);
   const [ap, setAp] = useState(7);
@@ -74,6 +98,15 @@ export default function Home() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [reels, setReels] = useState(["♠", "7", "★"]);
   const [slotLabel, setSlotLabel] = useState("FATE AWAITS");
+  const [playerPosition, setPlayerPosition] = useState({ x: 51, y: 71 });
+  const [destination, setDestination] = useState({ x: 51, y: 71 });
+  const [walking, setWalking] = useState(false);
+  const [walkFrame, setWalkFrame] = useState(1);
+  const [walkFacing, setWalkFacing] = useState<"left" | "right">("right");
+  const [walkDuration, setWalkDuration] = useState(500);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: InteractionTarget } | null>(null);
+  const [unlockedDoors, setUnlockedDoors] = useState<string[]>([]);
+  const [interior, setInterior] = useState<string | null>(null);
   const [dialogueInput, setDialogueInput] = useState("");
   const [dialogueBusy, setDialogueBusy] = useState(false);
   const [npc, setNpc] = useState<NpcState>({
@@ -93,6 +126,8 @@ export default function Home() {
     { id: 2, tone: "plain", text: "A rabid squirrel tears into a ration tin. Rowan watches from the bus wreck." },
   ]);
   const logId = useRef(3);
+  const sceneRef = useRef<HTMLElement | null>(null);
+  const walkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     try {
@@ -105,7 +140,7 @@ export default function Home() {
       if (save.skills) setSkills(save.skills);
       if (save.npc) setNpc(save.npc);
       if (save.worldFlags) setWorldFlags(save.worldFlags);
-      if (save.location) setLocation(save.location);
+      if (save.location && !String(save.location).includes("Salt Yard")) setLocation(save.location);
     } catch {
       // A damaged local save should never keep the player from starting.
     }
@@ -116,12 +151,83 @@ export default function Home() {
     localStorage.setItem("life-is-a-gamble-save", JSON.stringify(save));
   }, [level, xp, chips, skills, npc, worldFlags, location]);
 
+  useEffect(() => {
+    if (!walking) return;
+    const timer = setInterval(() => setWalkFrame((frame) => frame === 1 ? 2 : 1), 145);
+    return () => clearInterval(timer);
+  }, [walking]);
+
   const xpGoal = level * 100;
-  const currentFrame = combat === "player" ? 3 : combat === "enemy" ? 4 : 0;
+  const currentFrame = walking ? walkFrame : combat === "player" ? 3 : combat === "enemy" ? 4 : 0;
   const squirrelFrame = enemyHp <= 0 ? 4 : combat === "enemy" ? 3 : isSpinning ? 1 : 0;
 
   const addLog = (text: string, tone: LogEntry["tone"] = "plain") => {
     setLog((old) => [...old.slice(-5), { id: logId.current++, tone, text }]);
+  };
+
+  const walkTo = (event: React.MouseEvent<HTMLElement>) => {
+    if (interior || combat === "enemy" || isSpinning) return;
+    const bounds = sceneRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const x = Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100));
+    const y = Math.max(30, Math.min(86, ((event.clientY - bounds.top) / bounds.height) * 100));
+    const distance = Math.hypot((x - playerPosition.x) * bounds.width / 100, (y - playerPosition.y) * bounds.height / 100);
+    const duration = Math.max(240, Math.min(1700, distance * 3.5));
+    setContextMenu(null);
+    setWalkFacing(x < playerPosition.x ? "left" : "right");
+    setDestination({ x, y });
+    setWalkDuration(duration);
+    setWalking(true);
+    setPlayerPosition({ x, y });
+    if (walkTimer.current) clearTimeout(walkTimer.current);
+    walkTimer.current = setTimeout(() => setWalking(false), duration);
+  };
+
+  const openInteraction = (event: React.MouseEvent, target: InteractionTarget) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 235), y: Math.min(event.clientY, window.innerHeight - 175), target });
+  };
+
+  const enterTarget = (target: InteractionTarget) => {
+    setContextMenu(null);
+    if (target.inaccessible) {
+      addLog(`${target.label} is inaccessible. The passage has collapsed behind the door.`, "bad");
+      return;
+    }
+    if (target.locked && !unlockedDoors.includes(target.id)) {
+      addLog(`${target.label} is locked. Right-click and attempt to pick it.`, "bad");
+      return;
+    }
+    if (target.interior) {
+      setInterior(target.interior);
+      setLocation(`${target.interior}, Downtown Syracuse`);
+      addLog(`Entered ${target.interior}.`, "system");
+    }
+  };
+
+  const lockpickTarget = async (target: InteractionTarget) => {
+    setContextMenu(null);
+    if (!target.lockpick || target.inaccessible) return;
+    const result = await spinFate(`Lockpick · ${target.label}`);
+    const targetScore = 28 + skills.Mechanics * 9 + luck * 4;
+    if (result.score <= targetScore || result.jackpot) {
+      setUnlockedDoors((doors) => [...new Set([...doors, target.id])]);
+      awardXp(12);
+      addLog(`LOCK OPENED · ${target.label}. +12 XP.`, "good");
+    } else addLog(`The lock holds. Your bent pick is one mistake from snapping.`, "bad");
+  };
+
+  const useProp = (target: InteractionTarget) => {
+    setContextMenu(null);
+    if (target.action === "search") {
+      if (worldFlags.includes("Downtown sedan searched")) addLog("The sedan has already been picked clean.");
+      else {
+        setWorldFlags((flags) => [...flags, "Downtown sedan searched"]);
+        setChips((value) => value + 4);
+        addLog("You search the sedan: 4 chips and a damp parking receipt.", "good");
+      }
+    } else addLog("The lamp bears a municipal seal dated 2039. Its copper wiring is gone.");
   };
 
   const awardXp = (amount: number) => {
@@ -305,8 +411,6 @@ export default function Home() {
     setSkillPoints((v) => v - 1);
   };
 
-  const tileDecor = useMemo(() => ["crack", "bones", "grass", "debris", "", "", "", "tin"], []);
-
   return (
     <main className="game-shell">
       <header className="topbar">
@@ -330,37 +434,93 @@ export default function Home() {
           <button className={panel === "help" ? "active" : ""} onClick={() => setPanel(panel === "help" ? null : "help")}><b>?</b><span>CODEX</span><em>H</em></button>
         </aside>
 
-        <section className="scene" aria-label="Salt Yard isometric game scene">
-          <div className="sun-haze" />
-          <div className="distant-city"><i /><i /><i /><i /><i /></div>
-          <div className="scene-title"><small>DISCOVERED</small><strong>SALT YARD</strong><span>SYRACUSE FAIR RUINS · DANGER: LOW</span></div>
-          <div className="iso-board">
-            {Array.from({ length: 64 }, (_, index) => (
-              <div className={`iso-tile t${index % 8} ${tileDecor[index % tileDecor.length]}`} key={index}><span /></div>
-            ))}
-            <div className="wreck bus"><span>315</span><i /></div>
-            <div className="wreck kiosk"><span>NY</span></div>
-            <div className="road-sign"><span>ALBANY 142</span><span>BUFFALO 152</span></div>
-            <div className="entity player-entity">
-              <div className="status-tag you">YOU · {ap} AP</div>
-              <Sprite row={0} col={currentFrame} label="Wasteland courier" />
+        <section
+          ref={sceneRef}
+          className="scene city-scene"
+          aria-label="Walkable downtown Syracuse isometric game scene"
+          onClick={walkTo}
+          onContextMenu={(event) => { event.preventDefault(); setContextMenu(null); }}
+        >
+          {!interior ? <>
+            <div className="syracuse-skyline"><i /><i /><i /><i /><i /><i /></div>
+            <div className="scene-title downtown-title"><small>DISTRICT LOADED · CLICK GROUND TO WALK</small><strong>DOWNTOWN SYRACUSE</strong><span>CLINTON SQUARE ↔ ARMORY SQUARE · 0.3 MI COMPRESSED</span></div>
+            <div className="map-reference">STREET PLAN · REAL-WORLD DOWNTOWN ANCHORS</div>
+
+            <div className="street erie"><span>ERIE BLVD W</span></div>
+            <div className="street salina"><span>S SALINA ST</span></div>
+            <div className="street franklin"><span>S FRANKLIN ST</span></div>
+            <div className="street fayette"><span>W FAYETTE ST</span></div>
+            <div className="street washington"><span>W WASHINGTON ST</span></div>
+            <EnvSprite row={0} col={1} label="Cracked downtown intersection" className="city-tile tile-intersection" />
+            <EnvSprite row={0} col={0} label="Cracked Erie Boulevard road tile" className="city-tile tile-road-a" />
+            <EnvSprite row={0} col={2} label="Broken sidewalk corner" className="city-tile tile-sidewalk" />
+            <EnvSprite row={0} col={3} label="Clinton Square brick plaza" className="city-tile tile-plaza" />
+
+            <div className="district-label clinton-label"><b>CLINTON SQUARE</b><small>MONUMENT BASIN</small></div>
+            <div className="district-label armory-label"><b>ARMORY SQUARE</b><small>CARAVAN MARKET</small></div>
+            <div className="district-label hanover-label"><b>HANOVER SQUARE</b><small>NEUTRAL BLOCK</small></div>
+
+            <div className="city-building canal-museum" onClick={(e) => e.stopPropagation()}>
+              <EnvSprite row={3} col={0} label="Canal-era warehouse facade" className="building-art" />
+              <div className="building-name"><small>318 ERIE BLVD E</small><b>ERIE CANAL MUSEUM</b><span>MEMORY EXCHANGE</span></div>
+              <button className="hotspot door museum-door" onClick={(e) => openInteraction(e, interactions.museumDoor)} onContextMenu={(e) => openInteraction(e, interactions.museumDoor)} aria-label="Interact with Erie Canal Museum archive door"><EnvSprite row={1} col={2} label="Museum archive door" /></button>
+            </div>
+
+            <div className="city-building city-hall" onClick={(e) => e.stopPropagation()}>
+              <EnvSprite row={1} col={1} label="Soot-stained civic limestone building" className="building-art civic-art" />
+              <div className="building-name"><small>E WASHINGTON + MONTGOMERY</small><b>SYRACUSE CITY HALL</b><span>FREE RECORDS ANNEX</span></div>
+              <button className="hotspot door hall-door" onClick={(e) => openInteraction(e, interactions.cityHallDoor)} onContextMenu={(e) => openInteraction(e, interactions.cityHallDoor)} aria-label="Interact with City Hall records annex door"><EnvSprite row={1} col={2} label="Locked City Hall door" /></button>
+            </div>
+
+            <div className="city-building landmark-theatre" onClick={(e) => e.stopPropagation()}>
+              <EnvSprite row={3} col={1} label="Ruined Landmark Theatre storefront" className="building-art theatre-art" />
+              <div className="marquee">LANDMARK</div>
+              <button className="hotspot door theater-door" onClick={(e) => openInteraction(e, interactions.theaterDoor)} onContextMenu={(e) => openInteraction(e, interactions.theaterDoor)} aria-label="Interact with inaccessible Landmark Theatre door"><EnvSprite row={1} col={3} label="Boarded theater door" /></button>
+            </div>
+
+            <div className="city-building provisioners" onClick={(e) => e.stopPropagation()}>
+              <EnvSprite row={1} col={0} label="Ruined red brick provisioner building" className="building-art shop-art" />
+              <div className="building-name"><small>S CLINTON + W FAYETTE</small><b>CLINTON PROVISIONERS</b><span>LOCKED · TRADE GOODS</span></div>
+              <button className="hotspot door supply-door" onClick={(e) => openInteraction(e, interactions.supplyDoor)} onContextMenu={(e) => openInteraction(e, interactions.supplyDoor)} aria-label="Interact with locked provisioner door"><EnvSprite row={1} col={2} label="Locked steel shop door" /></button>
+            </div>
+
+            <button className="hotspot prop sedan-prop" onClick={(e) => openInteraction(e, interactions.sedan)} onContextMenu={(e) => openInteraction(e, interactions.sedan)} aria-label="Interact with abandoned sedan"><EnvSprite row={2} col={3} label="Rusted abandoned sedan" /></button>
+            <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with Erie Boulevard street lamp"><EnvSprite row={2} col={1} label="Bent street lamp" /></button>
+            <EnvSprite row={2} col={2} label="Scrap checkpoint barricade" className="city-prop barricade-prop" />
+            <EnvSprite row={3} col={2} label="Downtown rubble pile" className="city-prop rubble-prop" />
+            <EnvSprite row={3} col={3} label="Dead tree planter" className="city-prop tree-prop" />
+
+            <div className="walk-destination" style={{ left: `${destination.x}%`, top: `${destination.y}%` }} />
+            <div className={`downtown-player ${walking ? "walking" : ""}`} data-facing={walkFacing} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
+              <div className="status-tag you">YOU {walking ? "· WALKING" : "· READY"}</div>
+              <Sprite row={0} col={currentFrame} label="Courier walking through downtown Syracuse" />
               <div className="entity-ring" />
             </div>
-            <button className="entity rowan-entity" onClick={() => setPanel("dialogue")} aria-label="Talk to Rowan">
-              <div className="status-tag npc">ROWAN · TALK</div>
-              <Sprite row={2} col={npc.trust > 35 ? 3 : 0} label="Lone wanderer Rowan" />
-              <div className="entity-ring" />
+
+            <button className="downtown-rowan" onClick={(e) => { e.stopPropagation(); setPanel("dialogue"); }} aria-label="Talk to Rowan">
+              <div className="status-tag npc">ROWAN · TALK</div><Sprite row={2} col={npc.trust > 35 ? 3 : 0} label="Rowan near Clinton Square" /><div className="entity-ring" />
             </button>
-            {enemyHp > 0 && (
-              <button className="entity squirrel-entity" onClick={startCombat} aria-label="Engage rabid squirrel">
-                <div className="status-tag enemy">RABID SQUIRREL · {enemyHp}/18</div>
-                <Sprite row={1} col={squirrelFrame} label="Rabid squirrel" />
-                <div className="entity-ring" />
-              </button>
-            )}
-          </div>
-          {combat === "idle" && enemyHp > 0 && <button className="engage-prompt" onClick={startCombat}><span>THREAT SPOTTED</span> Engage rabid squirrel <kbd>E</kbd></button>}
-          {combat === "won" && <div className="victory-stamp">ENCOUNTER CLEARED <span>+65 XP</span></div>}
+            {enemyHp > 0 && <button className="downtown-squirrel" onClick={(e) => { e.stopPropagation(); startCombat(); }} aria-label="Engage rabid squirrel"><div className="status-tag enemy">RABID SQUIRREL · {enemyHp}/18</div><Sprite row={1} col={squirrelFrame} label="Rabid squirrel in Armory Square alley" /><div className="entity-ring" /></button>}
+            <div className="control-hint"><b>LEFT CLICK</b> WALK <i>•</i> <b>RIGHT CLICK</b> INTERACT <i>•</i> Doors remember locks</div>
+          </> : <div className="interior-scene">
+            <div className="interior-wall left-wall" /><div className="interior-wall right-wall" />
+            <EnvSprite row={0} col={3} label="Interior brick floor" className="interior-floor" />
+            <EnvSprite row={1} col={0} label="Interior brick wall" className="interior-brick" />
+            <EnvSprite row={2} col={2} label="Interior scrap counter" className="interior-counter" />
+            <div className="interior-card"><small>INTERIOR CELL</small><h2>{interior}</h2><p>{interior.includes("Museum") ? "Stacks of canal manifests survive behind steel mesh. Someone has circled Albany-bound shipments in red grease pencil." : interior.includes("City Hall") ? "Municipal ledgers cover the desks. The last entry is dated three weeks after the Federal Silence began." : "Shelves of canned roots and shotgun shells line the old storefront. The shopkeeper is elsewhere—for now."}</p><button onClick={(e) => { e.stopPropagation(); setInterior(null); setLocation("Downtown Syracuse — Clinton Square"); addLog(`Exited ${interior}.`); }}>EXIT TO STREET</button></div>
+            <div className="interior-player"><Sprite row={0} col={0} label="Courier inside building" /><div className="entity-ring" /></div>
+          </div>}
+
+          {contextMenu && <div className="interaction-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}>
+            <header><small>INTERACT WITH</small><strong>{contextMenu.target.label}</strong></header>
+            {contextMenu.target.kind === "door" ? <>
+              {contextMenu.target.inaccessible ? <button disabled><b>×</b><span>INACCESSIBLE<small>Collapsed beyond this point</small></span></button> : <button onClick={() => enterTarget(contextMenu.target)}><b>↳</b><span>ENTER<small>{contextMenu.target.locked && !unlockedDoors.includes(contextMenu.target.id) ? "Door is locked" : "Open passage"}</small></span></button>}
+              {contextMenu.target.lockpick && !unlockedDoors.includes(contextMenu.target.id) && <button onClick={() => lockpickTarget(contextMenu.target)}><b>⌁</b><span>LOCKPICK<small>Mechanics {skills.Mechanics} + Luck {luck}</small></span></button>}
+              <button onClick={() => { addLog(`${contextMenu.target.label}: ${contextMenu.target.inaccessible ? "the structure behind it has collapsed." : "a century-old entrance reinforced by recent hands."}`); setContextMenu(null); }}><b>?</b><span>EXAMINE<small>Perception check</small></span></button>
+            </> : <button onClick={() => useProp(contextMenu.target)}><b>⌕</b><span>{contextMenu.target.action === "search" ? "SEARCH" : "INSPECT"}<small>Interact with object</small></span></button>}
+          </div>}
+          {combat === "idle" && enemyHp > 0 && <button className="engage-prompt city-engage" onClick={(e) => { e.stopPropagation(); startCombat(); }}><span>ALLEY THREAT</span> Engage rabid squirrel <kbd>E</kbd></button>}
+          {combat === "won" && <div className="victory-stamp">ARMORY ALLEY CLEARED <span>+65 XP</span></div>}
         </section>
 
         <aside className="right-panel">
