@@ -278,10 +278,14 @@ type ModularBuildingProps = {
   doorBay?: number;
   storefront?: boolean;
   damaged?: boolean;
+  facade?: {
+    kind: "storefront" | "full" | "landmark";
+    id: string;
+  };
   onInteract: (event: React.MouseEvent, target: InteractionTarget) => void;
 };
 
-function ModularBuilding({ className, name, subtitle, material, floors, bays, door, doorBay = 1, storefront = false, damaged = false, onInteract }: ModularBuildingProps) {
+function ModularBuilding({ className, name, subtitle, material, floors, bays, door, doorBay = 1, storefront = false, damaged = false, facade, onInteract }: ModularBuildingProps) {
   const materialRow = material === "stone" ? 1 : material === "metal" ? 2 : 0;
   const cells = Array.from({ length: floors * bays }, (_, index) => {
     const floor = Math.floor(index / bays);
@@ -295,15 +299,18 @@ function ModularBuilding({ className, name, subtitle, material, floors, bays, do
     else if (floor < floors - 1) col = damaged && (index + bay) % 5 === 0 ? 2 : material === "stone" && bay % 3 === 0 ? 2 : 1;
     else col = bay % 2 === 0 ? 0 : 1;
     if (isDoor) { row = 2; col = 0; }
-    const tile = <BuildingTile row={row} col={col} className={isDoor ? "door-tile" : ""} />;
-    return isDoor && door ? <button key={index} className="building-door-cell" onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}>{tile}</button> : <div key={index} className="building-cell">{tile}</div>;
+    const tile = facade && isDoor ? null : <BuildingTile row={row} col={col} className={isDoor ? "door-tile" : ""} />;
+    return isDoor && door ? <button key={index} className={`building-door-cell${facade ? " facade-door-hitbox" : ""}`} onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}>{tile}</button> : <div key={index} className="building-cell">{tile}</div>;
   });
-  return <section className={`modular-building ${className} ${material}`} style={{ "--bays": bays, "--floors": floors } as CSSProperties} onClick={(event) => event.stopPropagation()}>
+  return <section className={`modular-building ${className} ${material}${facade ? ` has-facade facade-kind-${facade.kind} facade-id-${facade.id}` : ""}`} style={{ "--bays": bays, "--floors": floors } as CSSProperties} onClick={(event) => event.stopPropagation()}>
     <div className="building-roof"><BuildingTile row={2} col={2} /></div>
     <div className="building-side">{Array.from({ length: floors }, (_, floor) => <BuildingTile key={floor} row={material === "stone" ? 1 : 0} col={0} />)}</div>
-    <div className="building-face">{cells}</div>
+    <div className="building-face">
+      {facade && <div className={`building-facade-art ${facade.kind} facade-${facade.id}`} style={{ backgroundImage: `url('/${facade.kind === "landmark" ? "landmarks" : "storefronts"}/${facade.id}.png')` }} aria-hidden="true" />}
+      {cells}
+    </div>
     <div className="building-cornice"><BuildingTile row={material === "stone" ? 1 : 0} col={3} /></div>
-    <div className="building-sign"><strong>{name}</strong><small>{subtitle}</small></div>
+    <div className={`building-sign sign-${facade?.id ?? "default"}`}><strong>{name}</strong><small>{subtitle}</small></div>
   </section>;
 }
 
@@ -1132,18 +1139,18 @@ export default function Home() {
             </div>
 
             <div className="streetwall-row" aria-label="North Fayette Street building frontage">
-              <ModularBuilding className="build-bank" name="ONONDAGA TRUST" subtitle="SEALED PROPERTY" material="stone" floors={4} bays={4} door={interactions.bankDoor} doorBay={1} damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-canal" name="ERIE CANAL MUSEUM" subtitle="MEMORY EXCHANGE · OPEN" material="brick" floors={3} bays={4} door={interactions.museumDoor} doorBay={2} damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-provisioners" name="CLINTON PROVISIONERS" subtitle="TRADE GOODS · LOCKED" material="brick" floors={2} bays={4} door={interactions.supplyDoor} doorBay={1} storefront onInteract={openInteraction} />
-              <ModularBuilding className="build-market" name="SALINA MARKET" subtitle="SHUTTERED" material="brick" floors={3} bays={5} door={interactions.marketDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-hotel" name="EMPIRE ROOMS" subtitle="CONDEMNED" material="stone" floors={4} bays={3} door={interactions.hotelDoor} doorBay={1} damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-corner" name="CLINTON HOUSE" subtitle="CLAIMED · NO ENTRY" material="brick" floors={4} bays={5} door={interactions.houseDoor} doorBay={3} storefront onInteract={openInteraction} />
-              <ModularBuilding className="build-hall" name="CITY HALL ANNEX" subtitle="RECORDS · LOCKED" material="stone" floors={4} bays={4} door={interactions.cityHallDoor} doorBay={1} onInteract={openInteraction} />
-              <ModularBuilding className="build-foundry" name="SALT CITY FOUNDRY" subtitle="UNION PROPERTY" material="metal" floors={3} bays={5} door={interactions.foundryDoor} doorBay={2} damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-theatre" name="LANDMARK THEATRE" subtitle="STRUCTURE UNSAFE" material="brick" floors={3} bays={5} door={interactions.theaterDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-warehouse" name="ARMORY STORAGE" subtitle="NO TENANT" material="metal" floors={2} bays={4} door={interactions.warehouseDoor} doorBay={2} damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-rowhouse" name="HANOVER ROW" subtitle="RESIDENTIAL CLAIM" material="brick" floors={3} bays={3} door={interactions.rowhouseDoor} doorBay={1} damaged onInteract={openInteraction} />
-              <ModularBuilding className="build-saltworks" name="SALTWORKS EXCHANGE" subtitle="BOARDED" material="brick" floors={3} bays={4} door={interactions.saltworksDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-bank" name="ONONDAGA TRUST" subtitle="SEALED PROPERTY" material="stone" floors={4} bays={4} door={interactions.bankDoor} doorBay={1} damaged facade={{ kind: "storefront", id: "onondaga-trust" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-canal" name="ERIE CANAL MUSEUM" subtitle="WEIGHLOCK ARCHIVE · OPEN" material="brick" floors={3} bays={4} door={interactions.museumDoor} doorBay={2} damaged facade={{ kind: "landmark", id: "erie-canal-museum" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-provisioners" name="CLINTON PROVISIONERS" subtitle="TRADE GOODS · LOCKED" material="brick" floors={2} bays={4} door={interactions.supplyDoor} doorBay={3} storefront facade={{ kind: "storefront", id: "clinton-provisioners" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-market" name="SALINA MARKET" subtitle="SHUTTERED" material="brick" floors={3} bays={5} door={interactions.marketDoor} doorBay={3} storefront damaged facade={{ kind: "storefront", id: "salina-market" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-hotel" name="EMPIRE ROOMS" subtitle="CONDEMNED" material="stone" floors={4} bays={3} door={interactions.hotelDoor} doorBay={1} damaged facade={{ kind: "storefront", id: "empire-rooms" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-corner" name="CLINTON HOUSE" subtitle="CLAIMED · NO ENTRY" material="brick" floors={4} bays={5} door={interactions.houseDoor} doorBay={2} storefront facade={{ kind: "full", id: "clinton-house" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-hall" name="SYRACUSE CITY HALL" subtitle="RECORDS · LOCKED" material="stone" floors={4} bays={4} door={interactions.cityHallDoor} doorBay={1} facade={{ kind: "landmark", id: "syracuse-city-hall" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-foundry" name="SALT CITY FOUNDRY" subtitle="UNION PROPERTY" material="metal" floors={3} bays={5} door={interactions.foundryDoor} doorBay={4} damaged facade={{ kind: "storefront", id: "salt-city-foundry" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-theatre" name="LANDMARK THEATRE" subtitle="STRUCTURE UNSAFE" material="brick" floors={3} bays={5} door={interactions.theaterDoor} doorBay={2} storefront damaged facade={{ kind: "landmark", id: "landmark-theatre" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-warehouse" name="ARMORY STORAGE" subtitle="NO TENANT" material="metal" floors={2} bays={4} door={interactions.warehouseDoor} doorBay={2} damaged facade={{ kind: "storefront", id: "armory-storage" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-rowhouse" name="HANOVER ROW" subtitle="RESIDENTIAL CLAIM" material="brick" floors={3} bays={3} door={interactions.rowhouseDoor} doorBay={2} damaged facade={{ kind: "full", id: "hanover-row" }} onInteract={openInteraction} />
+              <ModularBuilding className="build-saltworks" name="SALTWORKS EXCHANGE" subtitle="BOARDED" material="brick" floors={3} bays={4} door={interactions.saltworksDoor} doorBay={0} storefront damaged facade={{ kind: "full", id: "saltworks-exchange" }} onInteract={openInteraction} />
             </div>
 
             <button className="hotspot prop sedan-prop" onClick={(e) => openInteraction(e, interactions.sedan)} onContextMenu={(e) => openInteraction(e, interactions.sedan)} aria-label="Interact with abandoned sedan"><LandmarkSprite row={0} col={0} label="Rusted abandoned sedan" /></button>

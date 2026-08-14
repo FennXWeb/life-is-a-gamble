@@ -332,6 +332,27 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .streetwall-row .building-door-cell{z-index:7;box-shadow:inset 0 -3px 0 #8c7045}
 .streetwall-row .building-door-cell::after{content:"ENTRY";position:absolute;left:3px;right:3px;bottom:3px;padding:3px 0;background:#131510e8;color:#d2ad61;font:700 6px monospace;letter-spacing:.08em;text-align:center;pointer-events:none}
 .streetwall-row .building-door-cell:hover{filter:brightness(1.4);box-shadow:inset 0 0 0 2px #e1b35b,0 0 10px #dc9f3e}
+.building-facade-art{position:absolute;z-index:2;pointer-events:none;background-repeat:no-repeat;background-position:center bottom;filter:saturate(.9) contrast(1.04)}
+.building-facade-art.storefront{left:-1px;right:-1px;bottom:-1px;height:calc((100% / var(--floors)) * 1.55);background-size:100% 100%}
+.building-facade-art.full,.building-facade-art.landmark{inset:-2px;background-size:100% 100%}
+.has-facade .building-cell{z-index:1}.has-facade .facade-door-hitbox{z-index:4;background:transparent;overflow:visible}
+.has-facade .facade-door-hitbox::before{content:"";position:absolute;inset:3px;border:1px solid transparent;transition:border-color .15s,box-shadow .15s}
+.has-facade .facade-door-hitbox:hover::before,.has-facade .facade-door-hitbox:focus-visible::before{border-color:#f0bd61;box-shadow:inset 0 0 10px #d7923155,0 0 9px #d7923177}
+.facade-kind-storefront>.building-sign{top:auto!important;bottom:calc((100% / var(--floors)) * 1.18)!important;transform:translateY(50%)}
+.has-facade>.building-sign{border-width:2px;padding:5px 9px;box-shadow:0 4px 9px #000,inset 0 0 7px #0008}
+.has-facade>.building-sign::before,.has-facade>.building-sign::after{content:"";position:absolute;width:3px;height:3px;border-radius:50%;top:4px;background:#a88a55;box-shadow:0 0 2px #000}.has-facade>.building-sign::before{left:4px}.has-facade>.building-sign::after{right:4px}
+.sign-onondaga-trust{left:18%!important;right:18%!important;text-align:center;background:linear-gradient(#4b3b25,#211b13)!important;border-color:#b48d4c!important;border-radius:4px}.sign-onondaga-trust strong{color:#e1c686!important}
+.sign-clinton-provisioners{left:10%!important;background:linear-gradient(#51361f,#261d14)!important;border-color:#745735!important;transform:translateY(50%) rotate(-1deg)!important}.sign-clinton-provisioners strong{font-family:Georgia,serif!important;color:#e0c397!important}
+.sign-salina-market{left:9%!important;background:#263b31f2!important;border:3px double #ad9f78!important}.sign-salina-market strong{color:#e4d3a3!important}
+.sign-empire-rooms{left:14%!important;background:#170f0ff2!important;border-color:#774233!important;border-radius:9px;box-shadow:0 0 7px #7c302b66,inset 0 0 6px #000!important}.sign-empire-rooms strong{color:#d9aa76!important;letter-spacing:.16em!important}
+.sign-salt-city-foundry{left:8%!important;background:linear-gradient(#4b4c44,#252824)!important;border-color:#90866d!important}.sign-salt-city-foundry::before,.sign-salt-city-foundry::after{background:#d0b375!important}.sign-salt-city-foundry strong{color:#d5c5a0!important}
+.sign-armory-storage{left:13%!important;background:#283326f2!important;border-color:#77754d!important}.sign-armory-storage strong{color:#cfbd79!important}
+.sign-clinton-house{top:31%!important;left:25%!important;bottom:auto!important;background:#5b5445e8!important;border-color:#aaa084!important;text-align:center}.sign-clinton-house strong{color:#211e18!important;text-shadow:0 1px #bdb295}
+.sign-hanover-row{top:46%!important;left:auto!important;right:-12px!important;bottom:auto!important;background:#26312cf2!important;border-color:#8b7b59!important;transform:rotate(-1.5deg)}
+.sign-saltworks-exchange{top:10%!important;left:8%!important;right:8%!important;bottom:auto!important;text-align:center;background:#57412cf2!important;border-color:#b49362!important}
+.sign-erie-canal-museum{top:12%!important;left:14%!important;right:14%!important;bottom:auto!important;text-align:center;background:#4d3425e8!important;border-color:#b38755!important}
+.sign-syracuse-city-hall{top:57%!important;left:17%!important;right:17%!important;bottom:auto!important;text-align:center;background:#726b59e8!important;border-color:#b2a681!important}.sign-syracuse-city-hall strong{color:#1b1c17!important;text-shadow:0 1px #c8b993}.sign-syracuse-city-hall small{color:#282b24!important}
+.sign-landmark-theatre{top:62%!important;left:7%!important;right:7%!important;bottom:auto!important;text-align:center;background:#d4c39ee8!important;border:3px double #7d5e33!important;box-shadow:0 3px 12px #000!important}.sign-landmark-theatre strong{color:#5a261d!important;font-size:clamp(8px,.65vw,12px)!important}.sign-landmark-theatre small{color:#4b4030!important}
 .hotspot.prop .landmark-sprite{width:100%;height:100%}
 .landmark-sprite.city-prop{position:absolute;z-index:22;background-color:transparent;mix-blend-mode:normal}
 .barricade-prop{left:58%;bottom:15%;width:108px;height:96px}

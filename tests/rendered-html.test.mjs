@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -47,4 +47,27 @@ test("keeps portraits, demographic voices, scaled decor, and jackpot feedback wi
   assert.match(speech, /demographics:/);
   assert.match(speech, /Keep this identity consistent across every line/);
   assert.match(audio, /sound === "slotJackpot"/);
+});
+
+test("uses authored storefront and Syracuse landmark sprites without losing door interactions", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  const assets = [
+    "../public/landmarks/erie-canal-museum.png",
+    "../public/landmarks/syracuse-city-hall.png",
+    "../public/landmarks/landmark-theatre.png",
+    "../public/storefronts/clinton-provisioners.png",
+    "../public/storefronts/salina-market.png",
+    "../public/storefronts/salt-city-foundry.png",
+    "../public/storefronts/armory-storage.png",
+  ];
+
+  await Promise.all(assets.map((asset) => access(new URL(asset, import.meta.url))));
+  assert.match(page, /building-facade-art/);
+  assert.match(page, /facade-door-hitbox/);
+  assert.match(page, /facade=\{\{ kind: "landmark", id: "syracuse-city-hall" \}\}/);
+  assert.match(css, /\.building-facade-art\.storefront/);
+  assert.match(css, /\.sign-landmark-theatre/);
 });
