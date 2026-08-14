@@ -1,10 +1,15 @@
-name: Build launcher channels
+name: Build Windows game channels
 
 on:
   push:
     branches: [main, testing]
     paths:
+      - "app/**"
+      - "game/**"
       - "launcher/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/launcher-release.yml"
   workflow_dispatch:
 
@@ -12,37 +17,85 @@ permissions:
   contents: write
 
 jobs:
-  windows-launcher:
+  windows-release:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: launcher
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: launcher/package-lock.json
-      - run: npm ci
-      - name: Set channel version
+          cache-dependency-path: |
+            package-lock.json
+            game/package-lock.json
+            launcher/package-lock.json
+
+      - name: Install web runtime dependencies
+        run: npm ci
+      - name: Build bundled game runtime
+        run: npm run build
+
+      - name: Install native game dependencies
+        run: npm ci
+        working-directory: game
+      - name: Install launcher dependencies
+        run: npm ci
+        working-directory: launcher
+
+      - name: Set release channel and version
         shell: pwsh
         run: |
           $channel = if ("${{ github.ref_name }}" -eq "testing") { "testing" } else { "latest" }
           $version = if ($channel -eq "testing") { "1.0.${{ github.run_number }}-testing.0" } else { "1.0.${{ github.run_number }}" }
-          npm version $version --no-git-tag-version
-          npm pkg set build.publish.channel=$channel
+          npm --prefix game version $version --no-git-tag-version
+          npm --prefix launcher version $version --no-git-tag-version
+          npm --prefix launcher pkg set build.publish.channel=$channel
           "RELEASE_CHANNEL=$channel" >> $env:GITHUB_ENV
-      - name: Publish installer and differential metadata
+          "APP_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build native game EXE
+        run: npm run dist
+        working-directory: game
+
+      - name: Publish launcher installer and differential patch metadata
         run: npm run release
+        working-directory: launcher
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EP_PRE_RELEASE: ${{ github.ref_name == 'testing' }}
           EP_DRAFT: false
+
+      - name: Attach standalone game EXE to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $gameExe = Get-ChildItem "game/release/Life-is-a-Gamble-Game-*.exe" | Select-Object -First 1
+          if (-not $gameExe) { throw "Standalone game executable was not created." }
+          gh release upload "v$env:APP_VERSION" $gameExe.FullName --clobber
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-ChildItem "game/release/Life-is-a-Gamble-Game-*.exe"
+            Get-ChildItem "launcher/release/Life-is-a-Gamble-Launcher-Setup-*.exe"
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          }
+          $lines | Set-Content "windows-sha256.txt"
+          gh release upload "v$env:APP_VERSION" "windows-sha256.txt" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/upload-artifact@v4
         with:
-          name: life-is-a-gamble-${{ github.ref_name }}-installer
+          name: life-is-a-gamble-${{ github.ref_name }}-windows
           path: |
-            launcher/release/*.exe
+            game/release/Life-is-a-Gamble-Game-*.exe
+            launcher/release/Life-is-a-Gamble-Launcher-Setup-*.exe
             launcher/release/*.blockmap
             launcher/release/*.yml
+            windows-sha256.txt

@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { useGameAudio } from "./game-audio";
 import type { CompanionState, DialogueAction, DialogueGameSnapshot, DialogueTurn, QuestState } from "./dialogue-contract";
 
-type Panel = "inventory" | "skills" | "map" | "journal" | "dialogue" | "help" | null;
+type Panel = "inventory" | "skills" | "map" | "journal" | "dialogue" | "help" | "saves" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
 type NpcId = "rowan" | "squirrel";
 type LogEntry = { id: number; tone: "system" | "good" | "bad" | "plain"; text: string };
@@ -185,6 +185,62 @@ const reelSymbols = ["♠", "7", "☢", "♦", "★", "BAR"];
 
 type EquipSlot = "head" | "torso" | "legs" | "hands" | "feet" | "holster-left" | "holster-right";
 type InventoryItem = { id: number; name: string; icon: string; x: number; y: number; w: number; h: number; note: string; weight: number; fits?: Exclude<EquipSlot, "holster-left" | "holster-right"> | "holster"; equipped: EquipSlot | null };
+
+const ACTIVE_SAVE_KEY = "life-is-a-gamble-save";
+const SAVE_SLOTS_KEY = "life-is-a-gamble-save-slots";
+const SAVE_SCHEMA_VERSION = 2;
+const MAX_MANUAL_SAVES = 8;
+
+type GameSnapshot = {
+  schemaVersion: number;
+  savedAt: string;
+  playtimeSeconds: number;
+  level: number;
+  xp: number;
+  chips: number;
+  skills: typeof initialSkills;
+  skillPoints: number;
+  npc: NpcState;
+  worldFlags: string[];
+  conversation: { speaker: string; text: string }[];
+  location: string;
+  hp: number;
+  maxHp: number;
+  ap: number;
+  enemyHp: number;
+  rowanHp: number;
+  combat: CombatState;
+  combatTarget: NpcId | null;
+  selectedNpc: NpcId | null;
+  unlockedDoors: string[];
+  playerPosition: WorldPoint;
+  enemyPosition: WorldPoint;
+  inventory: InventoryItem[];
+  quests: QuestState[];
+  companions: CompanionState[];
+  interior: string | null;
+  selectedAction: string;
+  log: LogEntry[];
+};
+
+type SaveSlot = {
+  id: string;
+  name: string;
+  kind: "manual" | "quick" | "auto";
+  createdAt: string;
+  updatedAt: string;
+  snapshot: GameSnapshot;
+};
+
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function formatPlaytime(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+}
 
 const inventoryItems: InventoryItem[] = [
   { id: 1, name: "Pipe Pistol", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "5–9 DMG · .22 scrapshot", weight: 2.1, fits: "holster", equipped: "holster-right" },
@@ -438,6 +494,9 @@ export default function Home() {
   const [quests, setQuests] = useState<QuestState[]>(initialQuests);
   const [companions, setCompanions] = useState<CompanionState[]>(initialCompanions);
   const [saveReady, setSaveReady] = useState(false);
+  const [saveSlotsReady, setSaveSlotsReady] = useState(false);
+  const [saveSlots, setSaveSlots] = useState<SaveSlot[]>([]);
+  const [hasActiveSave, setHasActiveSave] = useState(false);
   const [npc, setNpc] = useState<NpcState>({
     trust: 18,
     respect: 24,
@@ -461,49 +520,148 @@ export default function Home() {
   const enemyPatrolIndex = useRef(0);
   const enemyStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jackpotTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const npcCombatTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const combatTransitionRef = useRef(false);
   const voiceQueue = useRef<Promise<void>>(Promise.resolve());
   const activeAudio = useRef<HTMLAudioElement | null>(null);
   const createdQuestIds = useRef(new Set<string>());
   const resolvedQuestIds = useRef(new Set<string>());
+  const playtimeOffset = useRef(0);
+  const playtimeStartedAt = useRef(0);
+
+  const currentPlaytime = () => playtimeOffset.current + Math.max(0, Math.floor((Date.now() - playtimeStartedAt.current) / 1000));
+
+  const makeSnapshot = (): GameSnapshot => ({
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    savedAt: new Date().toISOString(),
+    playtimeSeconds: currentPlaytime(),
+    level,
+    xp,
+    chips,
+    skills: cloneValue(skills),
+    skillPoints,
+    npc: cloneValue(npc),
+    worldFlags: cloneValue(worldFlags),
+    conversation: cloneValue(conversation.slice(-40)),
+    location,
+    hp,
+    maxHp,
+    ap,
+    enemyHp,
+    rowanHp,
+    combat,
+    combatTarget,
+    selectedNpc,
+    unlockedDoors: cloneValue(unlockedDoors),
+    playerPosition: cloneValue(playerPosition),
+    enemyPosition: cloneValue(enemyPosition),
+    inventory: cloneValue(inventory),
+    quests: cloneValue(quests),
+    companions: cloneValue(companions),
+    interior,
+    selectedAction,
+    log: cloneValue(log.slice(-30)),
+  });
+
+  const restoreSnapshot = (save: Partial<GameSnapshot>) => {
+    movementToken.current += 1;
+    if (walkTimer.current) clearTimeout(walkTimer.current);
+    if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
+    setWalking(false);
+    setContextMenu(null);
+    setDialogueBusy(false);
+    setSpeakingCharacter(null);
+    activeAudio.current?.pause();
+    if (typeof save.level === "number") setLevel(save.level);
+    if (typeof save.xp === "number") setXp(save.xp);
+    if (typeof save.chips === "number") setChips(save.chips);
+    if (save.skills) setSkills(save.skills);
+    if (typeof save.skillPoints === "number") setSkillPoints(save.skillPoints);
+    if (save.npc) setNpc(save.npc);
+    if (Array.isArray(save.worldFlags)) setWorldFlags(save.worldFlags);
+    if (Array.isArray(save.conversation)) setConversation(save.conversation.slice(-40));
+    if (save.location && String(save.location).includes("Syracuse")) setLocation(save.location);
+    if (typeof save.hp === "number") setHp(save.hp);
+    if (typeof save.maxHp === "number") setMaxHp(save.maxHp);
+    if (typeof save.ap === "number") setAp(save.ap);
+    if (typeof save.enemyHp === "number") setEnemyHp(save.enemyHp);
+    if (typeof save.rowanHp === "number") setRowanHp(save.rowanHp);
+    if (save.combat && ["idle", "player", "enemy", "won"].includes(save.combat)) setCombat(save.combat);
+    setCombatTarget(save.combatTarget === "rowan" || save.combatTarget === "squirrel" ? save.combatTarget : null);
+    setSelectedNpc(save.selectedNpc === "rowan" || save.selectedNpc === "squirrel" ? save.selectedNpc : null);
+    if (Array.isArray(save.unlockedDoors)) setUnlockedDoors(save.unlockedDoors);
+    if (save.playerPosition && typeof save.playerPosition.x === "number" && typeof save.playerPosition.y === "number") {
+      setPlayerPosition(save.playerPosition);
+      setDestination(save.playerPosition);
+    }
+    if (save.enemyPosition && typeof save.enemyPosition.x === "number" && typeof save.enemyPosition.y === "number") setEnemyPosition(save.enemyPosition);
+    if (Array.isArray(save.inventory) && save.inventory.length) setInventory(save.inventory);
+    if (Array.isArray(save.quests)) {
+      setQuests(save.quests);
+      createdQuestIds.current = new Set(save.quests.map((quest) => quest.id));
+      resolvedQuestIds.current = new Set(save.quests.filter((quest) => quest.status !== "active").map((quest) => quest.id));
+    }
+    if (Array.isArray(save.companions)) setCompanions(save.companions);
+    setInterior(typeof save.interior === "string" ? save.interior : null);
+    if (typeof save.selectedAction === "string") setSelectedAction(save.selectedAction);
+    if (Array.isArray(save.log) && save.log.length) {
+      setLog(save.log.slice(-30));
+      logId.current = Math.max(...save.log.map((entry) => Number(entry.id) || 0), 2) + 1;
+    }
+    playtimeOffset.current = typeof save.playtimeSeconds === "number" ? Math.max(0, save.playtimeSeconds) : 0;
+    playtimeStartedAt.current = Date.now();
+  };
 
   useEffect(() => {
+    playtimeStartedAt.current = Date.now();
     try {
-      const raw = localStorage.getItem("life-is-a-gamble-save");
-      if (!raw) return;
-      const save = JSON.parse(raw);
-      if (save.level) setLevel(save.level);
-      if (typeof save.xp === "number") setXp(save.xp);
-      if (typeof save.chips === "number") setChips(save.chips);
-      if (save.skills) setSkills(save.skills);
-      if (save.npc) setNpc(save.npc);
-      if (save.worldFlags) setWorldFlags(save.worldFlags);
-      if (Array.isArray(save.conversation)) setConversation(save.conversation.slice(-40));
-      if (Array.isArray(save.inventory) && save.inventory.length) setInventory(save.inventory);
-      if (Array.isArray(save.quests)) setQuests(save.quests);
-      if (Array.isArray(save.companions)) setCompanions(save.companions);
-      if (typeof save.hp === "number") setHp(save.hp);
-      if (typeof save.maxHp === "number") setMaxHp(save.maxHp);
-      if (typeof save.ap === "number") setAp(save.ap);
-      if (typeof save.enemyHp === "number") setEnemyHp(save.enemyHp);
-      if (typeof save.rowanHp === "number") setRowanHp(save.rowanHp);
-      if (save.combatTarget === "rowan" || save.combatTarget === "squirrel") { setCombatTarget(save.combatTarget); setSelectedNpc(save.combatTarget); }
-      if (["idle", "player", "enemy", "won"].includes(save.combat)) setCombat(save.combat);
-      if (typeof save.skillPoints === "number") setSkillPoints(save.skillPoints);
-      if (Array.isArray(save.unlockedDoors)) setUnlockedDoors(save.unlockedDoors);
-      if (save.playerPosition) { setPlayerPosition(save.playerPosition); setDestination(save.playerPosition); }
-      if (save.location && String(save.location).includes("Syracuse")) setLocation(save.location);
+      const raw = localStorage.getItem(ACTIVE_SAVE_KEY);
+      if (raw) {
+        restoreSnapshot(JSON.parse(raw));
+        setHasActiveSave(true);
+      }
     } catch {
       // A damaged local save should never keep the player from starting.
     } finally {
       setSaveReady(true);
     }
+    try {
+      const rawSlots = localStorage.getItem(SAVE_SLOTS_KEY);
+      const parsed = rawSlots ? JSON.parse(rawSlots) : [];
+      if (Array.isArray(parsed)) setSaveSlots(parsed.filter((slot) => slot && typeof slot.id === "string" && slot.snapshot));
+    } catch {
+      // Ignore damaged slot indexes; the active autosave can still be loaded.
+    } finally {
+      setSaveSlotsReady(true);
+    }
   }, []);
 
   useEffect(() => {
     if (!saveReady) return;
-    const save = { level, xp, chips, skills, skillPoints, npc, worldFlags, conversation: conversation.slice(-40), location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory, quests, companions };
-    localStorage.setItem("life-is-a-gamble-save", JSON.stringify(save));
-  }, [saveReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory, quests, companions]);
+    const snapshot = makeSnapshot();
+    localStorage.setItem(ACTIVE_SAVE_KEY, JSON.stringify(snapshot));
+    if (!saveSlotsReady) return;
+    const timer = window.setTimeout(() => {
+      setSaveSlots((slots) => {
+        const existing = slots.find((slot) => slot.id === "autosave");
+        const autosave: SaveSlot = {
+          id: "autosave",
+          name: "AUTOSAVE",
+          kind: "auto",
+          createdAt: existing?.createdAt || snapshot.savedAt,
+          updatedAt: snapshot.savedAt,
+          snapshot,
+        };
+        return [autosave, ...slots.filter((slot) => slot.id !== "autosave")];
+      });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [saveReady, saveSlotsReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, unlockedDoors, playerPosition, enemyPosition, inventory, quests, companions, interior, selectedAction]);
+
+  useEffect(() => {
+    if (!saveSlotsReady) return;
+    localStorage.setItem(SAVE_SLOTS_KEY, JSON.stringify(saveSlots));
+  }, [saveSlotsReady, saveSlots]);
 
   useEffect(() => {
     if (!walking) return;
@@ -562,6 +720,106 @@ export default function Home() {
 
   const addLog = (text: string, tone: LogEntry["tone"] = "plain") => {
     setLog((old) => [...old.slice(-5), { id: logId.current++, tone, text }]);
+  };
+
+  const saveAvailable = !dialogueBusy && !isSpinning && !walking && combat !== "enemy";
+
+  const writeSaveSlot = (id: string, name: string, kind: SaveSlot["kind"]) => {
+    if (!saveAvailable) return false;
+    const snapshot = makeSnapshot();
+    setSaveSlots((slots) => {
+      const existing = slots.find((slot) => slot.id === id);
+      const next: SaveSlot = {
+        id,
+        name,
+        kind,
+        createdAt: existing?.createdAt || snapshot.savedAt,
+        updatedAt: snapshot.savedAt,
+        snapshot,
+      };
+      return [next, ...slots.filter((slot) => slot.id !== id)];
+    });
+    localStorage.setItem(ACTIVE_SAVE_KEY, JSON.stringify(snapshot));
+    setHasActiveSave(true);
+    audio.play("ui");
+    addLog(`${name} written to the courier archive.`, "good");
+    return true;
+  };
+
+  const createManualSave = (requestedName: string) => {
+    if (saveSlots.filter((slot) => slot.kind === "manual").length >= MAX_MANUAL_SAVES) return false;
+    const name = requestedName.trim().slice(0, 36) || `FIELD SAVE ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `manual-${Date.now()}`;
+    return writeSaveSlot(id, name.toUpperCase(), "manual");
+  };
+
+  const overwriteSave = (slot: SaveSlot) => {
+    if (slot.kind === "auto") return false;
+    if (!window.confirm(`Overwrite ${slot.name}?`)) return false;
+    return writeSaveSlot(slot.id, slot.name, slot.kind);
+  };
+
+  const deleteSave = (slot: SaveSlot) => {
+    if (slot.kind === "auto" || !window.confirm(`Delete ${slot.name}? This cannot be undone.`)) return;
+    setSaveSlots((slots) => slots.filter((candidate) => candidate.id !== slot.id));
+    audio.play("ui");
+  };
+
+  const loadSave = (slot: SaveSlot) => {
+    if (!mainMenu && !window.confirm(`Load ${slot.name}? Unsaved progress since the last autosave will be lost.`)) return;
+    restoreSnapshot(cloneValue(slot.snapshot));
+    localStorage.setItem(ACTIVE_SAVE_KEY, JSON.stringify(slot.snapshot));
+    setHasActiveSave(true);
+    setPanel(null);
+    setMainMenu(false);
+    audio.play("door");
+    addLog(`${slot.name} restored.`, "system");
+  };
+
+  const quickSave = () => {
+    if (!writeSaveSlot("quicksave", "QUICKSAVE", "quick")) addLog("Cannot save during movement, enemy actions, dialogue processing, or a Fate spin.", "bad");
+  };
+
+  const quickLoad = () => {
+    const slot = saveSlots.find((candidate) => candidate.id === "quicksave");
+    if (!slot) {
+      addLog("No quicksave exists yet. Press F5 to create one.", "bad");
+      return;
+    }
+    loadSave(slot);
+  };
+
+  const startNewGame = async () => {
+    if (hasActiveSave && !window.confirm("Start a new game? Named saves will remain available, but the active autosave will be replaced.")) return;
+    movementToken.current += 1;
+    if (walkTimer.current) clearTimeout(walkTimer.current);
+    if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
+    setPanel(null);
+    setLocation("Downtown Syracuse — Clinton Square");
+    setHp(32); setMaxHp(32); setAp(7); setEnemyHp(18); setRowanHp(26);
+    setCombat("idle"); setCombatTarget(null); setSelectedNpc(null);
+    setLevel(1); setXp(35); setChips(37); setSkillPoints(2); setSkills(cloneValue(initialSkills));
+    setSelectedAction("Pistol"); setReels(["♠", "7", "★"]); setSlotLabel("FATE AWAITS");
+    setPlayerPosition({ x: 51, y: 71 }); setDestination({ x: 51, y: 71 }); setWalking(false);
+    setEnemyPosition({ x: 66, y: 78 }); setEnemyMoving(false);
+    setUnlockedDoors([]); setInterior(null); setDialogueInput(""); setDialogueEngine(null);
+    setInventory(cloneValue(inventoryItems)); setQuests(cloneValue(initialQuests)); setCompanions(cloneValue(initialCompanions));
+    setNpc({ trust: 18, respect: 24, fear: 8, mood: "Wary", opinion: "Another hungry drifter with a loaded question.", memories: ["Saw you approach the Salt Yard alone."] });
+    setConversation([{ speaker: "ROWAN", text: "Easy. I’m not after your pack. Name’s Rowan. You always walk straight toward rabid wildlife, or is today special?" }]);
+    setWorldFlags(["Rowan met at Salt Yard"]);
+    setLog([
+      { id: 1, tone: "system", text: "YEAR 2186 · 100 years after the Federal Silence." },
+      { id: 2, tone: "plain", text: "A rabid squirrel tears into a ration tin. Rowan watches from the bus wreck." },
+    ]);
+    logId.current = 3;
+    createdQuestIds.current = new Set();
+    resolvedQuestIds.current = new Set();
+    playtimeOffset.current = 0;
+    playtimeStartedAt.current = Date.now();
+    setHasActiveSave(true);
+    await audio.activate("menu");
+    audio.play("door");
+    setMainMenu(false);
   };
 
   const beginRoute = (route: WorldPoint[]) => {
@@ -768,23 +1026,51 @@ export default function Home() {
     return { score: roll + (lucky ? 18 : 0), jackpot, symbols: finalSymbols };
   };
 
-  const startCombat = (requestedTarget?: NpcId) => {
+  const startCombat = (requestedTarget?: NpcId, initiator: "player" | "npc" = "player") => {
     const target = requestedTarget ?? selectedNpc ?? "squirrel";
     const targetHp = target === "rowan" ? rowanHp : enemyHp;
     if (targetHp <= 0) return false;
-    if (combat === "player" && combatTarget === target) return true;
-    const startingEncounter = combat !== "player";
+    if (initiator === "npc" && combatTransitionRef.current) return false;
+    if (initiator === "player" && combat === "player" && combatTarget === target) return true;
+    const startingEncounter = combat === "idle" || combat === "won";
     audio.play("enemyAggro");
     setSelectedNpc(target);
     setCombatTarget(target);
-    setCombat("player");
-    if (startingEncounter) setAp(7);
+    setCombat(initiator === "npc" ? "enemy" : "player");
+    if (initiator === "npc") setAp(0);
+    else if (startingEncounter) setAp(7);
     if (target === "rowan") {
-      if (!worldFlags.includes("Courier attacked Rowan")) setWorldFlags((flags) => [...flags, "Courier attacked Rowan"]);
-      setNpc((state) => ({ ...state, trust: clamp(state.trust - 24), respect: clamp(state.respect - 8), fear: clamp(state.fear + 18), mood: "Hostile", opinion: "You drew on me. Whatever this was before, it is over.", memories: [...state.memories.slice(-7), "The Courier raised a weapon against me."] }));
-      setCompanions((entries) => entries.map((companion) => companion.id === "rowan" && companion.status !== "dead" ? { ...companion, status: "hostile", loyalty: 0, morale: clamp(companion.morale - 30), opinion: "The Courier betrayed me at gunpoint.", history: [...companion.history, "The Courier attacked Rowan."].slice(-10) } : companion));
-      setPanel(null);
-      addLog("HOSTILITIES · Rowan reaches for her sidearm.", "bad");
+      const playerStartedIt = initiator === "player";
+      setWorldFlags((flags) => [...new Set([...flags, playerStartedIt ? "Courier attacked Rowan" : "Rowan initiated combat", "Rowan became hostile"])]);
+      setNpc((state) => ({
+        ...state,
+        trust: clamp(state.trust - (playerStartedIt ? 24 : 12)),
+        respect: clamp(state.respect - (playerStartedIt ? 8 : 5)),
+        fear: clamp(state.fear + (playerStartedIt ? 18 : 6)),
+        mood: "Hostile",
+        opinion: playerStartedIt ? "You drew on me. Whatever this was before, it is over." : "The talking is over. I chose to fire first.",
+        memories: [...state.memories.slice(-7), playerStartedIt ? "The Courier raised a weapon against me." : "I ended the exchange by drawing on the Courier."],
+      }));
+      setCompanions((entries) => entries.map((companion) => companion.id === "rowan" && companion.status !== "dead" ? {
+        ...companion,
+        status: "hostile",
+        loyalty: 0,
+        morale: clamp(companion.morale - 30),
+        opinion: playerStartedIt ? "The Courier betrayed me at gunpoint." : "I decided the Courier was too dangerous to leave standing.",
+        history: [...companion.history, playerStartedIt ? "The Courier attacked Rowan." : "Rowan initiated combat during dialogue."].slice(-10),
+      } : companion));
+      if (playerStartedIt) {
+        setPanel(null);
+        addLog("HOSTILITIES · Rowan reaches for her sidearm.", "bad");
+      } else {
+        combatTransitionRef.current = true;
+        addLog("DIALOGUE BROKEN · Rowan draws first. She has the initiative.", "bad");
+        if (npcCombatTimer.current) clearTimeout(npcCombatTimer.current);
+        npcCombatTimer.current = setTimeout(() => {
+          setPanel(null);
+          void enemyTurn("rowan").finally(() => { combatTransitionRef.current = false; });
+        }, 1100);
+      }
     } else addLog("TURN 1 · The squirrel bares wet, yellow teeth.", "bad");
     return true;
   };
@@ -999,7 +1285,9 @@ export default function Home() {
         return `ROWAN ATTACKS · ${damage} damage${remaining ? "" : " · enemy defeated"}`;
       }
       case "set_combat":
-        if (action.target === "player") { startCombat("rowan"); return "COMBAT STARTED · Dialogue became hostile"; }
+        if (action.target === "player") {
+          return startCombat("rowan", "npc") ? "COMBAT STARTED · Rowan seized the opening turn" : null;
+        }
         if (action.target === "idle") { setCombat("idle"); return "COMBAT ENDED · Hostility stood down"; }
         if (action.target === "won" && enemyHp <= 0) { setCombat("won"); return "ENCOUNTER RESOLVED"; }
         return null;
@@ -1225,6 +1513,25 @@ export default function Home() {
     setSkillPoints((v) => v - 1);
   };
 
+  useEffect(() => {
+    const handleSaveKeys = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select") && event.key !== "Escape") return;
+      if (event.key === "F5") {
+        event.preventDefault();
+        if (!mainMenu) quickSave();
+      } else if (event.key === "F9") {
+        event.preventDefault();
+        quickLoad();
+      } else if (event.key === "Escape") {
+        if (panel) setPanel(null);
+        else if (!mainMenu) setMainMenu(true);
+      }
+    };
+    window.addEventListener("keydown", handleSaveKeys);
+    return () => window.removeEventListener("keydown", handleSaveKeys);
+  }, [mainMenu, panel, quickSave, quickLoad]);
+
   return (
     <main className="game-shell" onClickCapture={(event) => {
       const target = event.target as HTMLElement;
@@ -1238,9 +1545,11 @@ export default function Home() {
           <div className={`radio-readout ${audio.ready ? "online" : ""}`}><b>{audio.ready ? "RADIO ONLINE · 89.7 WSTL" : "RADIO DORMANT"}</b><span>{audio.ready ? audio.musicStatus : "Activate audio to hear the title transmission"}</span></div>
           <div className="main-menu-actions">
             <button onClick={() => { void audio.activate("menu"); }}>{audio.ready ? "RESTART TITLE SIGNAL" : "WAKE THE RADIO"}</button>
-            <button className="enter-game" onClick={async () => { await audio.activate("menu"); audio.play("door"); setMainMenu(false); }}>ENTER SYRACUSE</button>
+            <button className="enter-game" disabled={!hasActiveSave} onClick={async () => { await audio.activate("menu"); audio.play("door"); setMainMenu(false); }}>CONTINUE</button>
+            <button onClick={() => { void startNewGame(); }}>NEW GAME</button>
+            <button onClick={() => setPanel("saves")} disabled={!saveSlots.length}>LOAD GAME</button>
           </div>
-          <em>Folder-driven soundtrack · Randomized by scene · Headphones recommended</em>
+          <em>F5 QUICK SAVE · F9 QUICK LOAD · ESC PAUSE MENU</em>
         </div>
       </section>}
       <header className="topbar">
@@ -1262,6 +1571,7 @@ export default function Home() {
           <button className={panel === "inventory" ? "active" : ""} onClick={() => setPanel(panel === "inventory" ? null : "inventory")}><b>▦</b><span>PACK</span><em>I</em></button>
           <button className={panel === "skills" ? "active" : ""} onClick={() => setPanel(panel === "skills" ? null : "skills")}><b>✦</b><span>SKILLS</span><em>K</em></button>
           <button className={panel === "journal" ? "active" : ""} onClick={() => setPanel(panel === "journal" ? null : "journal")}><b>◆</b><span>JOURNAL</span><em>J</em></button>
+          <button className={panel === "saves" ? "active" : ""} onClick={() => setPanel(panel === "saves" ? null : "saves")}><b>▣</b><span>SAVES</span><em>F5</em></button>
           <button className={panel === "help" ? "active" : ""} onClick={() => setPanel(panel === "help" ? null : "help")}><b>?</b><span>CODEX</span><em>H</em></button>
         </aside>
 
@@ -1419,7 +1729,7 @@ export default function Home() {
       </footer>
 
       {panel && (
-        <div className="overlay" role="presentation" onMouseDown={(e) => { if (e.currentTarget === e.target) setPanel(null); }}>
+        <div className={`overlay${panel === "saves" ? " save-overlay" : ""}`} role="presentation" onMouseDown={(e) => { if (e.currentTarget === e.target) setPanel(null); }}>
           <section className={`modal ${panel}`} role="dialog" aria-modal="true" aria-label={`${panel} panel`}>
             <button className="close" onClick={() => setPanel(null)} aria-label="Close panel">×</button>
 
@@ -1445,14 +1755,71 @@ export default function Home() {
                 engine={dialogueEngine}
                 activeQuestCount={quests.filter((quest) => quest.status === "active").length}
                 companionStatus={companions.find((companion) => companion.id === "rowan")?.status || "available"}
+                combatActive={combat === "enemy" && combatTarget === "rowan"}
               />
             )}
+            {panel === "saves" && <SaveLoad
+              slots={saveSlots}
+              allowSave={!mainMenu && saveAvailable}
+              blockedReason={!saveAvailable ? "Finish movement, dialogue, enemy actions, or the Fate spin before saving." : null}
+              onCreate={createManualSave}
+              onLoad={loadSave}
+              onOverwrite={overwriteSave}
+              onDelete={deleteSave}
+              onQuickSave={quickSave}
+            />}
             {panel === "help" && <Codex worldFlags={worldFlags} />}
           </section>
         </div>
       )}
     </main>
   );
+}
+
+function SaveLoad({ slots, allowSave, blockedReason, onCreate, onLoad, onOverwrite, onDelete, onQuickSave }: {
+  slots: SaveSlot[];
+  allowSave: boolean;
+  blockedReason: string | null;
+  onCreate: (name: string) => boolean;
+  onLoad: (slot: SaveSlot) => void;
+  onOverwrite: (slot: SaveSlot) => boolean;
+  onDelete: (slot: SaveSlot) => void;
+  onQuickSave: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [notice, setNotice] = useState("Named saves survive autosave changes and launcher updates.");
+  const manualCount = slots.filter((slot) => slot.kind === "manual").length;
+  const ordered = [...slots].sort((left, right) => {
+    const weight = { quick: 0, auto: 1, manual: 2 };
+    return weight[left.kind] - weight[right.kind] || right.updatedAt.localeCompare(left.updatedAt);
+  });
+  const create = () => {
+    if (!allowSave) return;
+    if (onCreate(name)) {
+      setName("");
+      setNotice("Manual save written successfully.");
+    } else {
+      setNotice(manualCount >= MAX_MANUAL_SAVES ? "Archive full. Delete or overwrite a manual save." : "The game cannot be saved right now.");
+    }
+  };
+  return <div className="save-view">
+    <div className="modal-head"><small>COURIER ARCHIVE · SCHEMA V{SAVE_SCHEMA_VERSION}</small><h2>SAVE / LOAD</h2><p>Keep up to {MAX_MANUAL_SAVES} named field records. Autosave tracks world changes; quicksave is bound to F5.</p></div>
+    <div className="save-toolbar">
+      <div><label htmlFor="save-name">NEW FIELD RECORD</label><input id="save-name" value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") create(); }} maxLength={36} placeholder={`Field save ${manualCount + 1}`} disabled={!allowSave || manualCount >= MAX_MANUAL_SAVES} /></div>
+      <button onClick={create} disabled={!allowSave || manualCount >= MAX_MANUAL_SAVES}>CREATE SAVE</button>
+      <button onClick={() => { onQuickSave(); setNotice("Quicksave updated."); }} disabled={!allowSave}>QUICKSAVE · F5</button>
+      <span>{manualCount}/{MAX_MANUAL_SAVES} MANUAL</span>
+    </div>
+    <div className={`save-notice${blockedReason ? " blocked" : ""}`}>{blockedReason || (!allowSave ? "Title archive is load-only. Enter Syracuse to create or overwrite saves." : notice)}</div>
+    <div className="save-slot-list">
+      {ordered.length ? ordered.map((slot) => <article className={`save-slot ${slot.kind}`} key={slot.id}>
+        <div className="save-slot-mark"><b>{slot.kind === "quick" ? "Q" : slot.kind === "auto" ? "A" : "S"}</b><span>{slot.kind}</span></div>
+        <div className="save-slot-info"><small>{slot.kind.toUpperCase()} RECORD · {new Date(slot.updatedAt).toLocaleString()}</small><strong>{slot.name}</strong><p>{slot.snapshot.location}</p><div><span>LEVEL {slot.snapshot.level}</span><span>HP {slot.snapshot.hp}/{slot.snapshot.maxHp}</span><span>{slot.snapshot.chips} CHIPS</span><span>PLAY {formatPlaytime(slot.snapshot.playtimeSeconds || 0)}</span></div></div>
+        <div className="save-slot-actions"><button className="load" onClick={() => onLoad(slot)}>LOAD</button>{slot.kind !== "auto" && <button onClick={() => { if (onOverwrite(slot)) setNotice(`${slot.name} overwritten.`); }} disabled={!allowSave}>OVERWRITE</button>}{slot.kind !== "auto" && <button className="danger" onClick={() => onDelete(slot)}>DELETE</button>}</div>
+      </article>) : <div className="save-empty"><strong>NO ARCHIVE RECORDS</strong><p>Enter Syracuse and create a manual save, or wait for the first autosave.</p></div>}
+    </div>
+    <footer className="save-footer"><span>F5 · QUICK SAVE</span><span>F9 · QUICK LOAD</span><span>AUTOSAVE · WORLD STATE CHANGES</span></footer>
+  </div>;
 }
 
 function LegacyInventory({ chips }: { chips: number }) {
@@ -1634,7 +2001,7 @@ function Journal({ quests, companions, dismiss }: { quests: QuestState[]; compan
   </div>;
 }
 
-function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice, engine, activeQuestCount, companionStatus }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; engine: "ai" | "local" | null; activeQuestCount: number; companionStatus: CompanionState["status"] }) {
+function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice, engine, activeQuestCount, companionStatus, combatActive }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; engine: "ai" | "local" | null; activeQuestCount: number; companionStatus: CompanionState["status"]; combatActive: boolean }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const box = transcriptRef.current;
@@ -1652,9 +2019,9 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
       <div className="likes"><span><b>LIKES</b> candor, maps, coffee</span><span><b>DISLIKES</b> Citadel clerks, threats</span></div>
     </aside>
     <section className="conversation">
-      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION · {engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}</small><strong>Say anything. Rowan remembers—and acts.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"} · {activeQuestCount} ACTIVE QUEST{activeQuestCount === 1 ? "" : "S"} · PARTY {companionStatus.toUpperCase()}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
+      <div className={`conversation-head${combatActive ? " hostile" : ""}`}><div><small>{combatActive ? "HOSTILITIES · ROWAN HAS INITIATIVE" : `LIVE CHARACTER SIMULATION · ${engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}`}</small><strong>{combatActive ? "Rowan drew first. Combat is beginning…" : "Say anything. Rowan remembers—and acts."}</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"} · {activeQuestCount} ACTIVE QUEST{activeQuestCount === 1 ? "" : "S"} · PARTY {companionStatus.toUpperCase()}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
       <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : line.speaker === "WORLD" ? "world-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CEDAR · ADULT BARITONE" : line.speaker === "WORLD" ? "STATE" : "MARIN · ADULT CONTRALTO"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Reading your words against memory, motive, and the state of the world…</p></div>}</div>
-      <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "CALCULATING…" : "SAY IT"}</button><small>Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions.</small></div>
+      <div className={`dialogue-compose${combatActive ? " hostile" : ""}`}><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} disabled={busy || combatActive} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder={combatActive ? "Rowan has ended the conversation." : "Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action."} maxLength={500} /><button onClick={speak} disabled={busy || combatActive || !input.trim()}>{combatActive ? "ENEMY TURN" : busy ? "CALCULATING…" : "SAY IT"}</button><small>{combatActive ? "Dialogue choices are locked while Rowan takes her opening combat action." : "Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions."}</small></div>
     </section>
   </div>;
 }

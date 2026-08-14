@@ -50,6 +50,7 @@ function parseActionTarget(target: string) {
 function validateActions(actions: DialogueAction[], game?: DialogueGameSnapshot) {
   const createdQuestIds = new Set<string>();
   const resolvedQuestIds = new Set<string>();
+  let combatActionSeen = false;
   return actions.flatMap((action): DialogueAction[] => {
     const target = action.target.trim();
     let valid = true;
@@ -60,7 +61,10 @@ function validateActions(actions: DialogueAction[], game?: DialogueGameSnapshot)
     if (action.type === "add_item") valid = grantableItemKeys.has(target);
     if (action.type === "remove_item") valid = inventoryItemKeys.has(target);
     if (action.type === "open_panel") valid = panels.has(target);
-    if (action.type === "set_combat") valid = combatStates.has(target);
+    if (action.type === "set_combat") {
+      valid = combatStates.has(target) && !combatActionSeen && (target !== "player" || (game?.rowanHp ?? 0) > 0);
+      if (valid) combatActionSeen = true;
+    }
     if (action.type === "equip_item") {
       const [item, slot] = target.split("@");
       valid = inventoryItemKeys.has(item) && equipmentSlots.has(slot);
@@ -222,6 +226,7 @@ function localTurn(data: TurnRequest): DialogueTurn {
     actions.push({ type: "add_world_flag", target: "Rowan became hostile", amount: 0, reason: "The player's credible threat permanently changed Rowan's disposition." });
     if (rowanCompanion?.status === "active") actions.push({ type: "remove_companion", target: "rowan", amount: 0, reason: "Rowan left the party after the Courier threatened her." });
     actions.push({ type: "modify_companion", target: "rowan|loyalty", amount: -15, reason: "The threat damaged Rowan's willingness to rely on the Courier." });
+    actions.push({ type: "set_combat", target: "player", amount: 0, reason: "Rowan ended the exchange by drawing and attacking before the Courier could act." });
     actions.push({ type: "close_dialogue", target: "", amount: 0, reason: "Rowan ended the conversation after a direct threat." });
   } else if (/trade|buy|sell|chips|ammo/.test(lower)) {
     intent = "barter";
@@ -266,7 +271,7 @@ const actionGuide = `You may request only these browser-side game actions. The a
 - change_hp: target player, amount -12..12, only for immediate treatment or physical harm in the scene.
 - change_ap: target player, amount -7..7, only when an immediate action affects the current turn.
 - damage_enemy: target squirrel, amount 1..12, only if Rowan physically attacks the present enemy.
-- set_combat: target idle, player, or won. Rowan and the squirrel are both valid combat targets in the current game snapshot. In Rowan dialogue, use player if the exchange directly causes Rowan to attack; use idle if both sides genuinely stand down, and never use won unless the active target is already defeated.
+- set_combat: target idle, player, or won. Rowan and the squirrel are both valid combat targets in the current game snapshot. In Rowan dialogue, use player if the exchange directly causes Rowan to attack; this gives Rowan the opening combat turn. If Rowan commits to violence in her spoken reply, always emit set_combat targeting player plus close_dialogue—never merely narrate an attack. Use idle if both sides genuinely stand down, and never use won unless the active target is already defeated.
 - unlock_door: target supply-door, museum-door, or city-hall-door, only if Rowan actually provides a key or opens it now.
 - enter_interior: target Clinton Provisioners, Erie Canal Museum Archive, or City Hall Records Annex, only when Rowan physically leads the Courier through an accessible entrance.
 - move_player: target rowan, clinton_square, salina_crossing, or squirrel_alley, only when Rowan physically leads or shoves the Courier there now.

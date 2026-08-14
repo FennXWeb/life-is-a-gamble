@@ -17,36 +17,52 @@
   },
   "devDependencies": {
     "electron": "40.4.0",
-    "electron-builder": "26.0.12"
+    "electron-builder": "26.0.12",
+    "rcedit": "^5.0.2"
   },
   "build": {
     "appId": "org.fennx.lifeisagamble.launcher",
-    "productName": "Life is a Gamble",
-    "artifactName": "Life-is-a-Gamble-Setup-${version}.${ext}",
+    "productName": "Life is a Gamble Launcher",
+    "artifactName": "Life-is-a-Gamble-Launcher-Setup-${version}.${ext}",
+    "afterPack": "../desktop/after-pack.cjs",
     "asar": true,
     "files": [
       "src/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "../game/release/win-unpacked",
+        "to": "game",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "directories": {
       "output": "release"
     },
     "win": {
+      "icon": "../desktop/assets/app-icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
     "nsis": {
+      "installerIcon": "../desktop/assets/app-icon.ico",
+      "uninstallerIcon": "../desktop/assets/app-icon.ico",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Life is a Gamble"
+      "shortcutName": "Life is a Gamble Launcher"
     },
     "publish": {
       "provider": "github",

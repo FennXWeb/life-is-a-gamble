@@ -24,7 +24,7 @@ function renderUpdate(update) {
   elements.check.disabled = Boolean(update.busy);
   elements.channel.disabled = Boolean(update.busy);
   elements.launchStatus.textContent = update.busy ? "UPDATE IN PROGRESS" : update.phase === "error" ? "UPDATE CHECK FAILED" : "READY";
-  elements.network.textContent = update.phase === "error" ? "DEGRADED" : "CONNECTED";
+  elements.network.textContent = update.phase === "error" ? "PATCH OFFLINE" : "NATIVE";
   elements.apply.hidden = update.phase !== "downloaded";
 }
 
@@ -45,7 +45,7 @@ function renderSaves(saves) {
     const name = document.createElement("strong"); name.textContent = save.name;
     const meta = document.createElement("span"); meta.textContent = `LV ${save.level} · ${save.location} · ${new Date(save.createdAt).toLocaleString()}`;
     info.append(name, meta);
-    const restore = document.createElement("button"); restore.textContent = "RESTORE"; restore.addEventListener("click", async () => { try { await window.launcher.restoreBackup(save.filename); toast("Save restored. The game has been reloaded."); } catch (error) { toast(error.message); } });
+    const restore = document.createElement("button"); restore.textContent = "RESTORE"; restore.addEventListener("click", async () => { try { await window.launcher.restoreBackup(save.filename); toast("Save restored. It will load on the next game launch."); } catch (error) { toast(error.message); } });
     const remove = document.createElement("button"); remove.textContent = "DELETE"; remove.className = "danger"; remove.addEventListener("click", async () => { try { renderSaves(await window.launcher.deleteBackup(save.filename)); } catch (error) { toast(error.message); } });
     row.append(info, restore, remove); elements.saveList.append(row);
   }

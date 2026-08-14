@@ -40,4 +40,6 @@ yarn-error.log*
 /work/
 /launcher/node_modules/
 /launcher/release/
+/game/node_modules/
+/game/release/
 *.tsbuildinfo

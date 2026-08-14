@@ -39,7 +39,8 @@ test("server-renders the Life is a Gamble game shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Life is a Gamble/);
-  assert.match(html, /ENTER SYRACUSE/);
+  assert.match(html, /NEW GAME/);
+  assert.match(html, /LOAD GAME/);
   assert.match(html, /DOWNTOWN SYRACUSE/);
   assert.match(html, /FATE ENGINE/);
   assert.match(html, /slot-machine/);
@@ -102,6 +103,26 @@ test("dialogue can create validated quests and recruit a companion", async () =>
   assert.ok(recruitTurn.actions.some((action) => action.type === "add_companion" && action.target === "rowan"));
 });
 
+test("hostile dialogue lets Rowan initiate combat and take the opening turn", async () => {
+  const response = await dialogue("Hand over your gear or I'll shoot you.");
+  assert.equal(response.status, 200);
+  const turn = await response.json();
+  assert.equal(turn.conversationStatus, "end");
+  assert.ok(turn.actions.some((action) => action.type === "set_combat" && action.target === "player"));
+  assert.ok(turn.actions.some((action) => action.type === "close_dialogue"));
+
+  const [page, route, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/dialogue/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /startCombat\("rowan", "npc"\)/);
+  assert.match(page, /enemyTurn\("rowan"\)/);
+  assert.match(page, /Rowan initiated combat/);
+  assert.match(route, /always emit set_combat targeting player plus close_dialogue/);
+  assert.match(css, /\.conversation-head\.hostile/);
+});
+
 test("quest and companion systems are persisted, visible, and included in AI context", async () => {
   const [page, contract, route, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -117,4 +138,25 @@ test("quest and companion systems are persisted, visible, and included in AI con
   assert.match(route, /including every active quest and Rowan's companion record/);
   assert.match(css, /\.journal-columns/);
   assert.match(css, /\.companion-hud/);
+});
+
+test("versioned save slots persist the complete RPG state in the native game", async () => {
+  const [page, css, nativeRuntime] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../game/src/main.cjs", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /SAVE_SCHEMA_VERSION = 2/);
+  assert.match(page, /MAX_MANUAL_SAVES = 8/);
+  assert.match(page, /const makeSnapshot/);
+  assert.match(page, /quests: cloneValue\(quests\)/);
+  assert.match(page, /companions: cloneValue\(companions\)/);
+  assert.match(page, /enemyPosition: cloneValue\(enemyPosition\)/);
+  assert.match(page, /event\.key === "F5"/);
+  assert.match(page, /event\.key === "F9"/);
+  assert.match(page, /<SaveLoad/);
+  assert.match(css, /\.save-slot-list/);
+  assert.match(nativeRuntime, /save-slots\.json/);
+  assert.match(nativeRuntime, /persistNativeSaves/);
 });

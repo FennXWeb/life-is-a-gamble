@@ -1,0 +1,60 @@
+{
+  "name": "life-is-a-gamble-game",
+  "version": "1.0.0",
+  "description": "Native Windows runtime for Life is a Gamble",
+  "main": "src/main.cjs",
+  "author": "FennXWeb",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check src/main.cjs && node --check src/server.cjs && node tests/server.test.cjs",
+    "dist": "electron-builder --win dir portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "40.4.0",
+    "electron-builder": "26.0.12",
+    "rcedit": "^5.0.2"
+  },
+  "build": {
+    "appId": "org.fennx.lifeisagamble.game",
+    "productName": "Life is a Gamble Game",
+    "artifactName": "Life-is-a-Gamble-Game-${version}.${ext}",
+    "afterPack": "../desktop/after-pack.cjs",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist",
+        "to": "game-dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "../desktop/assets/app-icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}

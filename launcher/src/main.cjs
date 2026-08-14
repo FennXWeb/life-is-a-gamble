@@ -1,20 +1,20 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
+const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-const GAME_URL = "https://life-is-a-gamble-rpg.neongrave.chatgpt.site/";
 const REPOSITORY_URL = "https://github.com/FennXWeb/life-is-a-gamble";
-const SAVE_KEY = "life-is-a-gamble-save";
 const CHANNELS = new Set(["main", "testing"]);
 
 let launcherWindow = null;
-let gameWindow = null;
 let settings = { channel: "main" };
 let updateState = { phase: "idle", busy: false, percent: 0, message: "Ready to play" };
 
-const settingsPath = () => path.join(app.getPath("userData"), "launcher-settings.json");
-const savesPath = () => path.join(app.getPath("userData"), "save-backups");
+const sharedRoot = () => path.join(app.getPath("appData"), "Life is a Gamble");
+const settingsPath = () => path.join(sharedRoot(), "launcher-settings.json");
+const savesPath = () => path.join(sharedRoot(), "saves", "backups");
+const activeSavePath = () => path.join(sharedRoot(), "saves", "active-save.json");
 
 async function loadSettings() {
   try {
@@ -24,8 +24,40 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
-  await fs.mkdir(app.getPath("userData"), { recursive: true });
+  await fs.mkdir(sharedRoot(), { recursive: true });
   await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), "utf8");
+}
+
+function gameCommand() {
+  if (app.isPackaged) {
+    return {
+      command: path.join(process.resourcesPath, "game", "Life is a Gamble Game.exe"),
+      args: [],
+    };
+  }
+  return {
+    command: process.execPath,
+    args: [path.resolve(__dirname, "..", "..", "game")],
+  };
+}
+
+async function launchGame() {
+  const target = gameCommand();
+  try {
+    await fs.access(target.command);
+  } catch {
+    throw new Error("The native game executable is missing. Reinstall or update Life is a Gamble.");
+  }
+  const environment = { ...process.env };
+  delete environment.ELECTRON_RUN_AS_NODE;
+  const child = spawn(target.command, target.args, {
+    detached: true,
+    stdio: "ignore",
+    cwd: path.dirname(target.command),
+    env: environment,
+    windowsHide: false,
+  });
+  child.unref();
 }
 
 function sendUpdateState(patch) {
@@ -81,44 +113,30 @@ function createLauncherWindow() {
   launcherWindow.on("closed", () => { launcherWindow = null; });
 }
 
-async function ensureGameWindow(show = true) {
-  if (gameWindow && !gameWindow.isDestroyed()) {
-    if (show) gameWindow.show();
-    return gameWindow;
-  }
-  gameWindow = new BrowserWindow({
-    width: 1500,
-    height: 920,
-    minWidth: 1100,
-    minHeight: 700,
-    show: false,
-    backgroundColor: "#080a08",
-    title: "Life is a Gamble",
-    webPreferences: {
-      partition: "persist:life-is-a-gamble-game",
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  gameWindow.removeMenu();
-  gameWindow.webContents.setWindowOpenHandler(({ url }) => { void shell.openExternal(url); return { action: "deny" }; });
-  gameWindow.on("closed", () => { gameWindow = null; });
-  await gameWindow.loadURL(GAME_URL);
-  if (show) gameWindow.show();
-  return gameWindow;
-}
-
 async function readActiveSave() {
-  const window = await ensureGameWindow(false);
-  if (!window.webContents.getURL().includes("neongrave.chatgpt.site")) throw new Error("Launch the game and sign in once before managing the active save.");
-  return window.webContents.executeJavaScript(`localStorage.getItem(${JSON.stringify(SAVE_KEY)})`, true);
+  try {
+    return await fs.readFile(activeSavePath(), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 async function writeActiveSave(rawSave) {
-  const window = await ensureGameWindow(false);
-  if (!window.webContents.getURL().includes("neongrave.chatgpt.site")) throw new Error("Launch the game and sign in once before restoring a save.");
-  await window.webContents.executeJavaScript(`localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(rawSave)}); location.reload();`, true);
+  JSON.parse(rawSave);
+  const directory = path.dirname(activeSavePath());
+  const temporaryPath = `${activeSavePath()}.tmp`;
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(temporaryPath, rawSave, "utf8");
+  await fs.rename(temporaryPath, activeSavePath());
+}
+
+async function removeActiveSave() {
+  try {
+    await fs.unlink(activeSavePath());
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
 }
 
 async function listBackups() {
@@ -138,10 +156,20 @@ async function listBackups() {
 }
 
 ipcMain.handle("launcher:get-state", async () => ({ version: app.getVersion(), channel: settings.channel, update: updateState, saves: await listBackups(), packaged: app.isPackaged }));
-ipcMain.handle("launcher:launch-game", async () => { if (updateState.busy) return { ok: false, error: "Finish the update before launching." }; await ensureGameWindow(true); return { ok: true }; });
+ipcMain.handle("launcher:launch-game", async () => {
+  if (updateState.busy) return { ok: false, error: "Finish the update before launching." };
+  try {
+    await launchGame();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
 ipcMain.handle("launcher:set-channel", async (_event, channel) => {
   if (!CHANNELS.has(channel)) throw new Error("Unknown release channel");
-  settings.channel = channel; await saveSettings(); configureUpdater();
+  settings.channel = channel;
+  await saveSettings();
+  configureUpdater();
   sendUpdateState({ phase: "idle", busy: false, percent: 0, message: `${channel === "testing" ? "Testing" : "Main"} channel selected` });
   void checkForUpdates();
   return { channel };
@@ -160,13 +188,12 @@ ipcMain.handle("saves:create", async (_event, requestedName) => {
   return listBackups();
 });
 ipcMain.handle("saves:restore", async (_event, filename) => {
-  const safeFile = path.basename(filename);
-  const wrapper = JSON.parse(await fs.readFile(path.join(savesPath(), safeFile), "utf8"));
+  const wrapper = JSON.parse(await fs.readFile(path.join(savesPath(), path.basename(filename)), "utf8"));
   await writeActiveSave(wrapper.data);
   return { ok: true };
 });
 ipcMain.handle("saves:delete", async (_event, filename) => { await fs.unlink(path.join(savesPath(), path.basename(filename))); return listBackups(); });
-ipcMain.handle("saves:reset-active", async () => { const window = await ensureGameWindow(false); await window.webContents.executeJavaScript(`localStorage.removeItem(${JSON.stringify(SAVE_KEY)}); location.reload();`, true); return { ok: true }; });
+ipcMain.handle("saves:reset-active", async () => { await removeActiveSave(); return { ok: true }; });
 ipcMain.handle("saves:open-folder", async () => { await fs.mkdir(savesPath(), { recursive: true }); return shell.openPath(savesPath()); });
 
 app.whenReady().then(async () => {
