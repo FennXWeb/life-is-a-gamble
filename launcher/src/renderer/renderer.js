@@ -25,7 +25,7 @@ function renderUpdate(update) {
   elements.channel.disabled = Boolean(update.busy);
   elements.launchStatus.textContent = update.busy ? "UPDATE IN PROGRESS" : update.phase === "error" ? "UPDATE CHECK FAILED" : "READY";
   elements.network.textContent = update.phase === "error" ? "PATCH OFFLINE" : "NATIVE";
-  elements.apply.hidden = update.phase !== "downloaded";
+  elements.apply.hidden = update.phase !== "launcher-downloaded";
 }
 
 function renderChannel(channel) {

@@ -2,7 +2,7 @@
 
 Life is a Gamble now ships as two native Windows applications:
 
-- **Life is a Gamble Launcher** installs and updates the complete game, selects the `main` or `testing` release channel, starts the game process, and manages save backups.
+- **Life is a Gamble Launcher** installs game updates in the background, only requests a restart for launcher updates, selects the `main` or `testing` release channel, starts the game process, and manages save backups.
 - **Life is a Gamble Game** is the standalone native game executable. It hosts the compiled game on a loopback-only server inside the process, so gameplay no longer depends on the hosted browser site.
 
 ## Local build
@@ -30,6 +30,9 @@ Native saves and launcher settings are stored outside the installation directory
 
 ```text
 %APPDATA%\Life is a Gamble\
+  game\
+    Life is a Gamble Game.exe
+    version.json
   launcher-settings.json
   saves\
     active-save.json
@@ -43,4 +46,6 @@ Set `OPENAI_API_KEY` in the environment that starts the game if AI dialogue and 
 
 ## Release channels
 
-Pushes to `main` publish stable `latest` builds. Pushes to `testing` publish prerelease `testing` builds. The Windows workflow builds the game first, embeds that build in the launcher installer, publishes differential updater metadata, and attaches the standalone game EXE plus checksums to the same GitHub release.
+Automated Windows updates publish from `testing` only. The workflow maintains a rolling testing manifest with independent game and launcher versions. Game-only changes replace the managed game executable after a streamed SHA-256-verified download and need no launcher restart. A launcher version is published only after `launcher/package.json` is intentionally bumped; that package downloads in the background and exposes **Restart & Apply** when ready.
+
+The first build of each launcher version also creates a conventional prerelease updater feed so older launchers can migrate to the split updater. The stable `main` branch is not changed or published automatically.

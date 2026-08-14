@@ -1,8 +1,8 @@
-name: Build Windows game channels
+name: Build Windows testing channel
 
 on:
   push:
-    branches: [main, testing]
+    branches: [testing]
     paths:
       - "app/**"
       - "game/**"
@@ -13,11 +13,16 @@ on:
       - ".github/workflows/launcher-release.yml"
   workflow_dispatch:
 
+concurrency:
+  group: windows-testing-channel
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
 jobs:
-  windows-release:
+  windows-testing:
+    if: github.ref_name == 'testing'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,60 +47,102 @@ jobs:
         run: npm ci
         working-directory: launcher
 
-      - name: Set release channel and version
+      - name: Set independent game and launcher versions
         shell: pwsh
         run: |
-          $channel = if ("${{ github.ref_name }}" -eq "testing") { "testing" } else { "latest" }
-          $version = if ($channel -eq "testing") { "1.0.${{ github.run_number }}-testing.0" } else { "1.0.${{ github.run_number }}" }
-          npm --prefix game version $version --no-git-tag-version
-          npm --prefix launcher version $version --no-git-tag-version
-          npm --prefix launcher pkg set build.publish.channel=$channel
-          "RELEASE_CHANNEL=$channel" >> $env:GITHUB_ENV
-          "APP_VERSION=$version" >> $env:GITHUB_ENV
+          $gameVersion = "1.0.${{ github.run_number }}-testing.0"
+          $launcherBase = (Get-Content "launcher/package.json" | ConvertFrom-Json).version
+          $launcherVersion = if ($launcherBase.Contains("-")) { $launcherBase } else { "$launcherBase-testing.0" }
+          npm --prefix game version $gameVersion --no-git-tag-version
+          npm --prefix launcher version $launcherVersion --no-git-tag-version
+          npm --prefix launcher pkg set build.publish.channel=testing
+          "GAME_VERSION=$gameVersion" >> $env:GITHUB_ENV
+          "LAUNCHER_VERSION=$launcherVersion" >> $env:GITHUB_ENV
+          "LAUNCHER_TAG=v$launcherVersion" >> $env:GITHUB_ENV
 
       - name: Build native game EXE
         run: npm run dist
         working-directory: game
 
-      - name: Publish launcher installer and differential patch metadata
+      - name: Detect launcher bootstrap release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view $env:LAUNCHER_TAG *> $null
+          $publish = if ($LASTEXITCODE -eq 0) { "false" } else { "true" }
+          "PUBLISH_LAUNCHER_BOOTSTRAP=$publish" >> $env:GITHUB_ENV
+
+      - name: Publish launcher bootstrap update
+        if: env.PUBLISH_LAUNCHER_BOOTSTRAP == 'true'
         run: npm run release
         working-directory: launcher
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EP_PRE_RELEASE: ${{ github.ref_name == 'testing' }}
+          EP_PRE_RELEASE: true
           EP_DRAFT: false
 
-      - name: Attach standalone game EXE to the release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $gameExe = Get-ChildItem "game/release/Life-is-a-Gamble-Game-*.exe" | Select-Object -First 1
-          if (-not $gameExe) { throw "Standalone game executable was not created." }
-          gh release upload "v$env:APP_VERSION" $gameExe.FullName --clobber
+      - name: Build rolling launcher package
+        if: env.PUBLISH_LAUNCHER_BOOTSTRAP != 'true'
+        run: npm run dist
+        working-directory: launcher
 
-      - name: Generate SHA-256 checksums
+      - name: Prepare rolling testing payloads
         shell: pwsh
         run: |
-          $files = @(
-            Get-ChildItem "game/release/Life-is-a-Gamble-Game-*.exe"
-            Get-ChildItem "launcher/release/Life-is-a-Gamble-Launcher-Setup-*.exe"
-          )
-          $lines = foreach ($file in $files) {
-            $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $($file.Name)"
+          New-Item -ItemType Directory -Force "release-assets" | Out-Null
+          $game = Get-ChildItem "game/release/Life-is-a-Gamble-Game-*.exe" | Select-Object -First 1
+          $launcher = Get-ChildItem "launcher/release/Life-is-a-Gamble-Launcher-Setup-*.exe" | Select-Object -First 1
+          $blockmap = Get-ChildItem "launcher/release/Life-is-a-Gamble-Launcher-Setup-*.exe.blockmap" | Select-Object -First 1
+          $updater = Get-Item "launcher/release/testing.yml"
+          if (-not $game -or -not $launcher -or -not $blockmap -or -not $updater) { throw "A Windows testing payload is missing." }
+
+          $gameTarget = "release-assets/Life-is-a-Gamble-Game-testing.exe"
+          Copy-Item $game.FullName $gameTarget
+          Copy-Item $launcher.FullName "release-assets/$($launcher.Name)"
+          Copy-Item $blockmap.FullName "release-assets/$($blockmap.Name)"
+          Copy-Item $updater.FullName "release-assets/testing.yml"
+
+          $gameHash = (Get-FileHash $gameTarget -Algorithm SHA256).Hash.ToLowerInvariant()
+          $launcherHash = (Get-FileHash $launcher.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $releaseRoot = "https://github.com/${{ github.repository }}/releases/download/v0.0.0-testing-channel"
+          $manifest = [ordered]@{
+            schemaVersion = 1
+            channel = "testing"
+            publishedAt = (Get-Date).ToUniversalTime().ToString("o")
+            game = [ordered]@{ version = $env:GAME_VERSION; url = "$releaseRoot/Life-is-a-Gamble-Game-testing.exe"; sha256 = $gameHash; size = (Get-Item $gameTarget).Length }
+            launcher = [ordered]@{ version = $env:LAUNCHER_VERSION; url = "$releaseRoot/$($launcher.Name)"; sha256 = $launcherHash; size = $launcher.Length }
           }
-          $lines | Set-Content "windows-sha256.txt"
-          gh release upload "v$env:APP_VERSION" "windows-sha256.txt" --clobber
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content "release-assets/channel-manifest.json"
+          @(
+            "$gameHash  Life-is-a-Gamble-Game-testing.exe"
+            "$launcherHash  $($launcher.Name)"
+          ) | Set-Content "release-assets/windows-sha256.txt"
+
+      - name: Publish rolling testing channel
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "v0.0.0-testing-channel" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "v0.0.0-testing-channel" --prerelease --title "Testing Channel" --notes "Rolling testing-channel payloads. Install through the launcher unless directed otherwise."
+          }
+          $manifest = "release-assets/channel-manifest.json"
+          $payloads = Get-ChildItem "release-assets" | Where-Object { $_.Name -ne "channel-manifest.json" }
+          foreach ($payload in $payloads) { gh release upload "v0.0.0-testing-channel" $payload.FullName --clobber }
+          gh release upload "v0.0.0-testing-channel" $manifest --clobber
+
+      - name: Attach game and checksums to launcher bootstrap release
+        if: env.PUBLISH_LAUNCHER_BOOTSTRAP == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $game = Get-ChildItem "game/release/Life-is-a-Gamble-Game-*.exe" | Select-Object -First 1
+          gh release upload $env:LAUNCHER_TAG $game.FullName "release-assets/windows-sha256.txt" --clobber
 
       - uses: actions/upload-artifact@v4
         with:
-          name: life-is-a-gamble-${{ github.ref_name }}-windows
-          path: |
-            game/release/Life-is-a-Gamble-Game-*.exe
-            launcher/release/Life-is-a-Gamble-Launcher-Setup-*.exe
-            launcher/release/*.blockmap
-            launcher/release/*.yml
-            windows-sha256.txt
+          name: life-is-a-gamble-testing-windows
+          path: release-assets/*

@@ -3,17 +3,26 @@ const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { compareVersions, downloadAndVerify, promoteDownload, validateManifest } = require("./update-service.cjs");
 
 const CHANNELS = new Set(["main", "testing"]);
+const TESTING_RELEASE_ROOT = "https://github.com/FennXWeb/life-is-a-gamble/releases/download/v0.0.0-testing-channel";
+const TESTING_MANIFEST_URL = `${TESTING_RELEASE_ROOT}/channel-manifest.json`;
 
 let launcherWindow = null;
-let settings = { channel: "main" };
+let settings = { channel: "testing" };
 let updateState = { phase: "idle", busy: false, percent: 0, message: "Ready to play" };
+let updateCheckPromise = null;
 
 const sharedRoot = () => path.join(app.getPath("appData"), "Life is a Gamble");
 const settingsPath = () => path.join(sharedRoot(), "launcher-settings.json");
 const savesPath = () => path.join(sharedRoot(), "saves", "backups");
 const activeSavePath = () => path.join(sharedRoot(), "saves", "active-save.json");
+const managedGameDirectory = () => path.join(sharedRoot(), "game");
+const managedGamePath = () => path.join(managedGameDirectory(), "Life is a Gamble Game.exe");
+const managedGameVersionPath = () => path.join(managedGameDirectory(), "version.json");
+const bundledGamePath = () => path.join(process.resourcesPath, "game", "Life is a Gamble Game.exe");
+const bundledGamePackagePath = () => path.join(process.resourcesPath, "bundled-game-package.json");
 
 async function loadSettings() {
   try {
@@ -27,10 +36,14 @@ async function saveSettings() {
   await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), "utf8");
 }
 
-function gameCommand() {
+async function gameCommand() {
   if (app.isPackaged) {
+    try {
+      await fs.access(managedGamePath());
+      return { command: managedGamePath(), args: [] };
+    } catch { /* use the game bundled with the launcher */ }
     return {
-      command: path.join(process.resourcesPath, "game", "Life is a Gamble Game.exe"),
+      command: bundledGamePath(),
       args: [],
     };
   }
@@ -41,7 +54,7 @@ function gameCommand() {
 }
 
 async function launchGame() {
-  const target = gameCommand();
+  const target = await gameCommand();
   try {
     await fs.access(target.command);
   } catch {
@@ -64,36 +77,92 @@ function sendUpdateState(patch) {
   launcherWindow?.webContents.send("launcher:update-state", updateState);
 }
 
-function configureUpdater() {
+function configureLauncherUpdater() {
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowPrerelease = settings.channel === "testing";
-  autoUpdater.channel = settings.channel === "testing" ? "testing" : "latest";
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowPrerelease = true;
+  autoUpdater.channel = "testing";
+  autoUpdater.setFeedURL({ provider: "generic", url: TESTING_RELEASE_ROOT, channel: "testing" });
 }
 
 function wireUpdaterEvents() {
-  autoUpdater.on("checking-for-update", () => sendUpdateState({ phase: "checking", busy: false, percent: 0, message: `Checking ${settings.channel} channel…` }));
-  autoUpdater.on("update-available", (info) => sendUpdateState({ phase: "downloading", busy: true, percent: 0, message: `Downloading ${info.version} in the background…` }));
-  autoUpdater.on("update-not-available", () => sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Game is up to date" }));
-  autoUpdater.on("download-progress", (progress) => sendUpdateState({ phase: "downloading", busy: true, percent: Math.max(0, Math.min(100, progress.percent || 0)), message: `Patching in background · ${Math.round(progress.percent || 0)}%` }));
-  autoUpdater.on("update-downloaded", (info) => sendUpdateState({ phase: "downloaded", busy: true, percent: 100, message: `${info.version} ready · restart to apply` }));
-  autoUpdater.on("error", (error) => {
-    const message = String(error?.message || "");
-    if (/no published versions/i.test(message)) {
-      sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Installed build is ready · no newer channel build" });
-      return;
-    }
-    sendUpdateState({ phase: "error", busy: false, percent: 0, message: message || "Update service unavailable" });
-  });
+  autoUpdater.on("checking-for-update", () => sendUpdateState({ phase: "launcher-check", busy: false, percent: 0, message: "Checking launcher package…" }));
+  autoUpdater.on("update-available", (info) => sendUpdateState({ phase: "launcher-downloading", busy: true, percent: 0, message: `Launcher ${info.version} downloading in the background…` }));
+  autoUpdater.on("update-not-available", () => sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Game and launcher are up to date" }));
+  autoUpdater.on("download-progress", (progress) => sendUpdateState({ phase: "launcher-downloading", busy: true, percent: Math.max(0, Math.min(100, progress.percent || 0)), message: `Launcher download · ${Math.round(progress.percent || 0)}%` }));
+  autoUpdater.on("update-downloaded", (info) => sendUpdateState({ phase: "launcher-downloaded", busy: false, percent: 100, message: `Launcher ${info.version} ready · restart to apply` }));
+  autoUpdater.on("error", (error) => sendUpdateState({ phase: "error", busy: false, percent: 0, message: String(error?.message || "Update service unavailable").replace(/github/ig, "update service") }));
 }
 
-async function checkForUpdates() {
+async function readJson(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function installedGameVersion() {
+  const managed = await readJson(managedGameVersionPath());
+  if (managed?.version) return String(managed.version);
+  const bundled = await readJson(bundledGamePackagePath());
+  return String(bundled?.version || "0.0.0");
+}
+
+async function fetchTestingManifest() {
+  const response = await fetch(`${TESTING_MANIFEST_URL}?t=${Date.now()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json", "User-Agent": "Life-is-a-Gamble-Launcher" },
+  });
+  if (!response.ok) throw new Error(`Update manifest unavailable (${response.status}).`);
+  return validateManifest(await response.json());
+}
+
+async function installGameUpdate(asset) {
+  const downloadPath = path.join(managedGameDirectory(), "Life is a Gamble Game.next.exe");
+  await downloadAndVerify(asset, downloadPath, (percent) => {
+    const rounded = Math.max(0, Math.min(100, Math.round(percent || 0)));
+    sendUpdateState({ phase: "game-downloading", busy: true, percent: rounded, message: `Installing game ${asset.version} in background · ${rounded}%` });
+  });
+  sendUpdateState({ phase: "game-installing", busy: true, percent: 100, message: `Applying game ${asset.version}…` });
+  await promoteDownload(downloadPath, managedGamePath());
+  await fs.writeFile(managedGameVersionPath(), JSON.stringify({ version: asset.version, installedAt: new Date().toISOString() }, null, 2), "utf8");
+}
+
+async function performUpdateCheck() {
   if (!app.isPackaged) {
     sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Development build · updater disabled" });
     return { development: true };
   }
-  configureUpdater();
-  return autoUpdater.checkForUpdates();
+  if (settings.channel !== "testing") {
+    sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Stable installation ready · testing updates paused" });
+    return { channel: "main", updated: false };
+  }
+  sendUpdateState({ phase: "checking", busy: false, percent: 0, message: "Checking testing channel…" });
+  const manifest = await fetchTestingManifest();
+  const currentGameVersion = await installedGameVersion();
+  let gameUpdated = false;
+  if (compareVersions(manifest.game.version, currentGameVersion) > 0) {
+    await installGameUpdate(manifest.game);
+    gameUpdated = true;
+  }
+  if (compareVersions(manifest.launcher.version, app.getVersion()) > 0) {
+    configureLauncherUpdater();
+    await autoUpdater.checkForUpdates();
+    return { gameUpdated, launcherUpdate: true };
+  }
+  sendUpdateState({ phase: "ready", busy: false, percent: 100, message: gameUpdated ? `Game ${manifest.game.version} installed · no restart required` : "Game and launcher are up to date" });
+  return { gameUpdated, launcherUpdate: false };
+}
+
+function checkForUpdates() {
+  if (updateCheckPromise) return updateCheckPromise;
+  updateCheckPromise = performUpdateCheck().catch((error) => {
+    sendUpdateState({ phase: "error", busy: false, percent: 0, message: String(error?.message || "Update service unavailable").replace(/github/ig, "update service") });
+    return { error: String(error?.message || error) };
+  }).finally(() => { updateCheckPromise = null; });
+  return updateCheckPromise;
 }
 
 function createLauncherWindow() {
@@ -177,13 +246,12 @@ ipcMain.handle("launcher:set-channel", async (_event, channel) => {
   if (!CHANNELS.has(channel)) throw new Error("Unknown release channel");
   settings.channel = channel;
   await saveSettings();
-  configureUpdater();
   sendUpdateState({ phase: "idle", busy: false, percent: 0, message: `${channel === "testing" ? "Testing" : "Main"} channel selected` });
   void checkForUpdates();
   return { channel };
 });
 ipcMain.handle("launcher:check-updates", () => checkForUpdates());
-ipcMain.handle("launcher:install-update", () => { if (updateState.phase === "downloaded") autoUpdater.quitAndInstall(false, true); });
+ipcMain.handle("launcher:install-update", () => { if (updateState.phase === "launcher-downloaded") autoUpdater.quitAndInstall(false, true); });
 ipcMain.handle("saves:create", async (_event, requestedName) => {
   const raw = await readActiveSave();
   if (!raw) throw new Error("No active game save exists yet.");
@@ -206,7 +274,6 @@ ipcMain.handle("saves:open-folder", async () => { await fs.mkdir(savesPath(), { 
 app.whenReady().then(async () => {
   await loadSettings();
   wireUpdaterEvents();
-  configureUpdater();
   createLauncherWindow();
   setTimeout(() => { void checkForUpdates(); }, 1300);
 });
