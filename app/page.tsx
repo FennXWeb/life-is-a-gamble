@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useGameAudio } from "./game-audio";
+import type { DialogueAction, DialogueGameSnapshot, DialogueTurn } from "./dialogue-contract";
 
 type Panel = "inventory" | "skills" | "map" | "dialogue" | "help" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
@@ -62,6 +63,27 @@ const inventoryItems: InventoryItem[] = [
   { id: 10, name: "Canvas Trousers", icon: "⋔", x: 6, y: 3, w: 2, h: 2, note: "+2 carry weight · reinforced knees", weight: 1.5, fits: "legs", equipped: null },
   { id: 11, name: "Scrap Knife", icon: "†", x: 0, y: 3, w: 1, h: 2, note: "3–6 DMG · quiet and close", weight: .8, fits: "holster", equipped: null },
 ];
+
+const dialogueItemCatalog: Record<string, InventoryItem> = {
+  "rowan-map": { id: 101, name: "Rowan's Transit Map", icon: "⌁", x: 0, y: 0, w: 1, h: 1, note: "Annotated safe lanes · Rowan's handwriting", weight: .1, equipped: null },
+  "chicory-flask": { id: 102, name: "Chicory Flask", icon: "◒", x: 0, y: 0, w: 1, h: 2, note: "+4 HP · bitter enough to work", weight: .5, equipped: null },
+  "field-bandage": { id: 103, name: "Field Bandage", icon: "+", x: 0, y: 0, w: 1, h: 1, note: "+6 HP · clean by wasteland standards", weight: .2, equipped: null },
+  "scrapshot-box": { id: 104, name: "Scrapshot Box", icon: "∷", x: 0, y: 0, w: 1, h: 1, note: "12 rounds · mixed .22 scrapshot", weight: .7, equipped: null },
+  "spare-lockpick": { id: 105, name: "Spare Lockpick", icon: "⌁", x: 0, y: 0, w: 1, h: 2, note: "+5% Lockpick · Rowan's spare", weight: .1, equipped: null },
+};
+
+function inventoryKey(item: InventoryItem) {
+  return item.name.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function findInventorySpace(items: InventoryItem[], width: number, height: number) {
+  const packed = items.filter((item) => !item.equipped);
+  for (let y = 0; y <= 6 - height; y++) for (let x = 0; x <= 10 - width; x++) {
+    const clear = packed.every((item) => x + width <= item.x || item.x + item.w <= x || y + height <= item.y || item.y + item.h <= y);
+    if (clear) return { x, y };
+  }
+  return null;
+}
 
 function Sprite({ row, col, label, className = "" }: { row: number; col: number; label: string; className?: string }) {
   return (
@@ -219,6 +241,9 @@ export default function Home() {
   const [dialogueBusy, setDialogueBusy] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [speakingCharacter, setSpeakingCharacter] = useState<"YOU" | "ROWAN" | null>(null);
+  const [dialogueEngine, setDialogueEngine] = useState<"ai" | "local" | null>(null);
+  const [inventory, setInventory] = useState<InventoryItem[]>(inventoryItems);
+  const [saveReady, setSaveReady] = useState(false);
   const [npc, setNpc] = useState<NpcState>({
     trust: 18,
     respect: 24,
@@ -252,16 +277,29 @@ export default function Home() {
       if (save.skills) setSkills(save.skills);
       if (save.npc) setNpc(save.npc);
       if (save.worldFlags) setWorldFlags(save.worldFlags);
+      if (Array.isArray(save.conversation)) setConversation(save.conversation.slice(-40));
+      if (Array.isArray(save.inventory) && save.inventory.length) setInventory(save.inventory);
+      if (typeof save.hp === "number") setHp(save.hp);
+      if (typeof save.maxHp === "number") setMaxHp(save.maxHp);
+      if (typeof save.ap === "number") setAp(save.ap);
+      if (typeof save.enemyHp === "number") setEnemyHp(save.enemyHp);
+      if (["idle", "player", "enemy", "won"].includes(save.combat)) setCombat(save.combat);
+      if (typeof save.skillPoints === "number") setSkillPoints(save.skillPoints);
+      if (Array.isArray(save.unlockedDoors)) setUnlockedDoors(save.unlockedDoors);
+      if (save.playerPosition) { setPlayerPosition(save.playerPosition); setDestination(save.playerPosition); }
       if (save.location && String(save.location).includes("Syracuse")) setLocation(save.location);
     } catch {
       // A damaged local save should never keep the player from starting.
+    } finally {
+      setSaveReady(true);
     }
   }, []);
 
   useEffect(() => {
-    const save = { level, xp, chips, skills, npc, worldFlags, location };
+    if (!saveReady) return;
+    const save = { level, xp, chips, skills, skillPoints, npc, worldFlags, conversation: conversation.slice(-40), location, hp, maxHp, ap, enemyHp, combat, unlockedDoors, playerPosition, inventory };
     localStorage.setItem("life-is-a-gamble-save", JSON.stringify(save));
-  }, [level, xp, chips, skills, npc, worldFlags, location]);
+  }, [saveReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, combat, unlockedDoors, playerPosition, inventory]);
 
   useEffect(() => {
     if (!walking) return;
@@ -490,12 +528,16 @@ export default function Home() {
   };
 
   const fallbackDialogue = (message: string, roll: number) => {
-    const lower = message.toLowerCase();
-    if (/help|squirrel|fight/.test(lower)) return "I’ll cover the road, but that little plague-bag is yours. Don’t let it get behind you.";
-    if (/albany|citadel|marble/.test(lower)) return "The Marble Crown? White stone outside, iron rules underneath. They’re buying pre-Silence records—and burying some of them.";
-    if (/government|silence|collapse/.test(lower)) return "My grandmother called it the Federal Silence. Orders stopped, money froze, and every county became a little kingdom with a hungry army.";
-    if (/trade|buy|sell|chips/.test(lower)) return roll < 55 ? "Maybe. Show me something useful and keep your hands where I can see them." : "Not today. I don’t know you well enough to open my pack.";
-    return roll < 45 ? "That’s a strange thing to say out here. Still… I believe you mean it." : "Words are cheap on this road. Give me a reason to remember yours.";
+    const subject = message.toLowerCase().match(/[a-z']{4,}/g)?.find((word) => !["what", "where", "when", "that", "this", "with", "your", "about", "would", "could"].includes(word)) || "that";
+    const previous = [...conversation].reverse().find((line) => line.speaker === "YOU")?.text;
+    const seed = [...message].reduce((total, character) => total + character.charCodeAt(0), roll + conversation.length);
+    const responses = [
+      `You chose “${subject}” carefully. I can hear the request underneath it, but I want you to say which part costs me something.`,
+      `${previous ? `That's not quite where you left the last thought.` : "You waited before saying that."} Are you asking what I know about ${subject}, or what I'm willing to do about it?`,
+      `The Fate reels liked your timing more than I did. Give me one concrete thing about ${subject}, and I'll give you one honest answer.`,
+      `I don't have a clean answer for ${subject}. I have a useful one, but those usually come with terms.`,
+    ];
+    return responses[seed % responses.length];
   };
 
   const speakWithDeviceVoice = (text: string, character: "player" | "rowan") => new Promise<void>((resolve) => {
@@ -554,6 +596,136 @@ export default function Home() {
     });
   };
 
+  const applyDialogueAction = (action: DialogueAction) => {
+    const amount = Math.round(Number(action.amount) || 0);
+    switch (action.type) {
+      case "add_world_flag":
+        if (!action.target || worldFlags.includes(action.target)) return null;
+        setWorldFlags((flags) => [...new Set([...flags, action.target])]);
+        return `WORLD STATE · ${action.target}`;
+      case "remove_world_flag":
+        if (!worldFlags.includes(action.target)) return null;
+        setWorldFlags((flags) => flags.filter((flag) => flag !== action.target));
+        return `WORLD STATE REMOVED · ${action.target}`;
+      case "award_xp": {
+        const gained = Math.max(1, Math.min(25, amount));
+        awardXp(gained);
+        return `+${gained} XP · ${action.reason}`;
+      }
+      case "change_chips": {
+        const change = Math.max(-25, Math.min(25, amount));
+        if (change < 0 && chips < Math.abs(change)) return "TRANSACTION FAILED · Not enough chips";
+        setChips((value) => Math.max(0, value + change));
+        audio.play(change > 0 ? "loot" : "ui");
+        return `${change >= 0 ? "+" : ""}${change} CHIPS · ${action.reason}`;
+      }
+      case "change_hp": {
+        const change = Math.max(-12, Math.min(12, amount));
+        setHp((value) => Math.max(1, Math.min(maxHp, value + change)));
+        return `${change >= 0 ? "+" : ""}${change} HP · ${action.reason}`;
+      }
+      case "change_ap": {
+        const change = Math.max(-7, Math.min(7, amount));
+        setAp((value) => Math.max(0, Math.min(7, value + change)));
+        return `${change >= 0 ? "+" : ""}${change} AP · ${action.reason}`;
+      }
+      case "damage_enemy": {
+        if (action.target !== "squirrel" || enemyHp <= 0) return null;
+        const damage = Math.max(1, Math.min(12, amount));
+        const remaining = Math.max(0, enemyHp - damage);
+        setEnemyHp(remaining);
+        audio.play("enemyDamaged");
+        if (!remaining) {
+          setCombat("won");
+          setWorldFlags((flags) => [...new Set([...flags, "Rowan killed the Salt Yard squirrel"])]);
+        }
+        return `ROWAN ATTACKS · ${damage} damage${remaining ? "" : " · enemy defeated"}`;
+      }
+      case "set_combat":
+        if (action.target === "player") { startCombat(); return "COMBAT STARTED · Dialogue became hostile"; }
+        if (action.target === "idle") { setCombat("idle"); return "COMBAT ENDED · Hostility stood down"; }
+        if (action.target === "won" && enemyHp <= 0) { setCombat("won"); return "ENCOUNTER RESOLVED"; }
+        return null;
+      case "unlock_door": {
+        const target = Object.values(interactions).find((entry) => entry.id === action.target);
+        if (!target || target.inaccessible || unlockedDoors.includes(target.id)) return null;
+        setUnlockedDoors((doors) => [...new Set([...doors, target.id])]);
+        audio.play("lockpick");
+        return `ACCESS GRANTED · ${target.label}`;
+      }
+      case "enter_interior": {
+        const target = Object.values(interactions).find((entry) => entry.interior === action.target);
+        if (!target?.interior || target.inaccessible) return null;
+        setUnlockedDoors((doors) => [...new Set([...doors, target.id])]);
+        setInterior(target.interior);
+        setLocation(`${target.interior}, Downtown Syracuse`);
+        audio.play("door");
+        return `ENTERED · ${target.interior}`;
+      }
+      case "move_player": {
+        const anchors: Record<string, { x: number; y: number }> = {
+          rowan: { x: 36, y: 72 }, clinton_square: { x: 35, y: 58 },
+          salina_crossing: { x: 52, y: 64 }, squirrel_alley: { x: 61, y: 76 },
+        };
+        const destinationPoint = anchors[action.target];
+        if (!destinationPoint) return null;
+        setWalkFacing(destinationPoint.x < playerPosition.x ? "left" : "right");
+        setDestination(destinationPoint); setPlayerPosition(destinationPoint); setWalkDuration(700); setMovementMode("walk"); setWalking(true);
+        if (walkTimer.current) clearTimeout(walkTimer.current);
+        walkTimer.current = setTimeout(() => setWalking(false), 700);
+        return `MOVED · ${action.target.replaceAll("_", " ")}`;
+      }
+      case "grant_skill_points": {
+        const gained = Math.max(1, Math.min(3, amount));
+        setSkillPoints((points) => points + gained);
+        return `+${gained} SKILL POINT${gained === 1 ? "" : "S"}`;
+      }
+      case "modify_skill": {
+        if (!(action.target in skills)) return null;
+        const name = action.target as keyof typeof skills;
+        const change = amount < 0 ? -1 : 1;
+        setSkills((values) => ({ ...values, [name]: Math.max(0, Math.min(10, values[name] + change)) }));
+        return `${name.toUpperCase()} ${change > 0 ? "+1" : "−1"} · ${action.reason}`;
+      }
+      case "add_item": {
+        const template = dialogueItemCatalog[action.target];
+        if (!template || inventory.some((item) => inventoryKey(item) === action.target)) return null;
+        if (action.target === "scrapshot-box" && chips < 3) return "ITEM NOT RECEIVED · Payment did not clear";
+        const position = findInventorySpace(inventory, template.w, template.h);
+        if (!position) return "ITEM NOT RECEIVED · Pack has no room";
+        setInventory((items) => [...items, { ...template, ...position }]);
+        audio.play("loot");
+        return `ITEM RECEIVED · ${template.name}`;
+      }
+      case "remove_item": {
+        const item = inventory.find((entry) => inventoryKey(entry) === action.target);
+        if (!item) return null;
+        setInventory((items) => items.filter((entry) => entry.id !== item.id));
+        return `ITEM REMOVED · ${item.name}`;
+      }
+      case "equip_item": {
+        const [key, requestedSlot] = action.target.split("@");
+        const item = inventory.find((entry) => inventoryKey(entry) === key);
+        const slot = requestedSlot as EquipSlot;
+        if (!item || !["head", "torso", "legs", "hands", "feet", "holster-left", "holster-right"].includes(slot)) return null;
+        const compatible = item.fits === slot || (item.fits === "holster" && slot.startsWith("holster"));
+        if (!compatible || inventory.some((entry) => entry.id !== item.id && entry.equipped === slot)) return null;
+        setInventory((items) => items.map((entry) => entry.id === item.id ? { ...entry, equipped: slot } : entry));
+        audio.play("equip");
+        return `EQUIPPED · ${item.name}`;
+      }
+      case "open_panel":
+        if (!["inventory", "skills", "map", "help"].includes(action.target)) return null;
+        window.setTimeout(() => setPanel(action.target as Panel), 900);
+        return `OPENING ${action.target.toUpperCase()} · ${action.reason}`;
+      case "close_dialogue":
+        window.setTimeout(() => setPanel(null), 1200);
+        return "CONVERSATION ENDED";
+      default:
+        return null;
+    }
+  };
+
   const speak = async () => {
     const message = dialogueInput.trim();
     if (!message || dialogueBusy) return;
@@ -566,11 +738,19 @@ export default function Home() {
       const response = await fetch("/api/dialogue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, npc, skills, luck, slot: slot.score, worldFlags, location, history: conversation.slice(-10) }),
+        body: JSON.stringify({
+          message, npc, skills, luck, slot: slot.score, worldFlags, location,
+          history: conversation.slice(-24),
+          game: {
+            hp, maxHp, ap, enemyHp, combat, level, xp, xpGoal, chips, skillPoints,
+            unlockedDoors, interior, playerPosition,
+            inventory: inventory.map((item) => ({ id: item.id, name: item.name, equipped: item.equipped })),
+          } satisfies DialogueGameSnapshot,
+        }),
       });
       if (!response.ok) throw new Error("Dialogue service unavailable");
-      const turn = await response.json();
-      setConversation((v) => [...v, { speaker: "ROWAN", text: turn.reply }]);
+      const turn = await response.json() as DialogueTurn;
+      setDialogueEngine(turn.engine || "ai");
       queueVoice(turn.reply, "rowan", turn.mood || npc.mood);
       setNpc((old) => ({
         trust: clamp(old.trust + Number(turn.trustDelta || 0)),
@@ -578,16 +758,19 @@ export default function Home() {
         fear: clamp(old.fear + Number(turn.fearDelta || 0)),
         mood: turn.mood || old.mood,
         opinion: turn.opinion || old.opinion,
-        memories: [...old.memories, turn.memory || `You said: ${message}`].slice(-6),
+        memories: [...old.memories, turn.memory || `You said: ${message}`].slice(-12),
       }));
-      if (turn.worldEvent) {
-        setWorldFlags((v) => [...new Set([...v, turn.worldEvent])]);
-        addLog(`WORLD UPDATED · ${turn.worldEvent}`, "system");
+      const effects = (turn.actions || []).map(applyDialogueAction).filter((effect): effect is string => Boolean(effect));
+      effects.forEach((effect) => addLog(effect, effect.includes("FAILED") ? "bad" : "system"));
+      const checkText = effects.length ? effects.join(" · ") : turn.actionCheck || "No immediate world change.";
+      setConversation((lines) => [...lines, { speaker: "ROWAN", text: turn.reply }, { speaker: "WORLD", text: `ACTION CHECK · ${checkText}` }]);
+      if (turn.conversationStatus === "end" && !(turn.actions || []).some((action) => action.type === "close_dialogue" || action.type === "set_combat")) {
+        window.setTimeout(() => setPanel(null), 1400);
       }
-      if (turn.xp) awardXp(Math.min(20, Number(turn.xp)));
     } catch {
       const reply = fallbackDialogue(message, slot.score);
-      setConversation((v) => [...v, { speaker: "ROWAN", text: reply }]);
+      setDialogueEngine("local");
+      setConversation((v) => [...v, { speaker: "ROWAN", text: reply }, { speaker: "WORLD", text: "ACTION CHECK · Dialogue service unreachable; no game state changed." }]);
       queueVoice(reply, "rowan", slot.score < 55 ? "curious" : "guarded");
       setNpc((old) => ({
         ...old,
@@ -769,7 +952,7 @@ export default function Home() {
           <section className={`modal ${panel}`} role="dialog" aria-modal="true" aria-label={`${panel} panel`}>
             <button className="close" onClick={() => setPanel(null)} aria-label="Close panel">×</button>
 
-            {panel === "inventory" && <Inventory chips={chips} playEquip={() => audio.play("equip")} />}
+            {panel === "inventory" && <Inventory chips={chips} playEquip={() => audio.play("equip")} items={inventory} setItems={setInventory} />}
             {panel === "skills" && <Skills level={level} skills={skills} points={skillPoints} upgrade={upgradeSkill} />}
             {panel === "map" && <WorldMap level={level} location={location} travel={travel} />}
             {panel === "dialogue" && (
@@ -784,6 +967,7 @@ export default function Home() {
                 voiceEnabled={voiceEnabled}
                 speakingCharacter={speakingCharacter}
                 toggleVoice={toggleVoice}
+                engine={dialogueEngine}
               />
             )}
             {panel === "help" && <Codex worldFlags={worldFlags} />}
@@ -822,8 +1006,7 @@ function LegacyInventory({ chips }: { chips: number }) {
   </div>;
 }
 
-function Inventory({ chips, playEquip }: { chips: number; playEquip: () => void }) {
-  const [items, setItems] = useState<InventoryItem[]>(inventoryItems);
+function Inventory({ chips, playEquip, items, setItems }: { chips: number; playEquip: () => void; items: InventoryItem[]; setItems: React.Dispatch<React.SetStateAction<InventoryItem[]>> }) {
   const [selectedId, setSelectedId] = useState(inventoryItems[0].id);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -937,7 +1120,7 @@ function WorldMap({ level, location, travel }: { level: number; location: string
   </div>;
 }
 
-function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void }) {
+function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice, engine }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; engine: "ai" | "local" | null }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const box = transcriptRef.current;
@@ -955,9 +1138,9 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
       <div className="likes"><span><b>LIKES</b> candor, maps, coffee</span><span><b>DISLIKES</b> Citadel clerks, threats</span></div>
     </aside>
     <section className="conversation">
-      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION</small><strong>Say anything. Rowan remembers.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
-      <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CORAL" : "CEDAR"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Weighing your words against what you have already said…</p></div>}</div>
-      <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "THINKING…" : "SAY IT"}</button><small>Every line is spoken. Voices are AI-generated. Rowan tracks context, subtext, memory, mood, and consequences.</small></div>
+      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION · {engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}</small><strong>Say anything. Rowan remembers—and acts.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
+      <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : line.speaker === "WORLD" ? "world-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CORAL" : line.speaker === "WORLD" ? "STATE" : "CEDAR"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Reading your words against memory, motive, and the state of the world…</p></div>}</div>
+      <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "CALCULATING…" : "SAY IT"}</button><small>Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions.</small></div>
     </section>
   </div>;
 }
