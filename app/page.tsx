@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useGameAudio } from "./game-audio";
 
 type Panel = "inventory" | "skills" | "map" | "dialogue" | "help" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
@@ -185,6 +186,8 @@ function clamp(value: number) {
 }
 
 export default function Home() {
+  const audio = useGameAudio();
+  const [mainMenu, setMainMenu] = useState(true);
   const [panel, setPanel] = useState<Panel>(null);
   const [location, setLocation] = useState("Downtown Syracuse — Clinton Square");
   const [hp, setHp] = useState(32);
@@ -323,6 +326,7 @@ export default function Home() {
       return;
     }
     if (target.interior) {
+      audio.play("door");
       setInterior(target.interior);
       setLocation(`${target.interior}, Downtown Syracuse`);
       addLog(`Entered ${target.interior}.`, "system");
@@ -332,13 +336,21 @@ export default function Home() {
   const lockpickTarget = async (target: InteractionTarget) => {
     setContextMenu(null);
     if (!target.lockpick || target.inaccessible) return;
+    audio.play("lockpick");
     const result = await spinFate(`Lockpick · ${target.label}`);
     const targetScore = 28 + skills.Mechanics * 9 + luck * 4;
     if (result.score <= targetScore || result.jackpot) {
       setUnlockedDoors((doors) => [...new Set([...doors, target.id])]);
+      audio.play("loot");
       awardXp(12);
       addLog(`LOCK OPENED · ${target.label}. +12 XP.`, "good");
-    } else addLog(`The lock holds. Your bent pick is one mistake from snapping.`, "bad");
+    } else if (result.score > targetScore + 25) {
+      audio.play("lockBreak");
+      addLog(`LOCKPICK BROKE · The snapped tip is still inside ${target.label}'s lock.`, "bad");
+    } else {
+      audio.play("lockpick");
+      addLog(`The lock holds. Your bent pick is one mistake from snapping.`, "bad");
+    }
   };
 
   const useProp = (target: InteractionTarget) => {
@@ -346,6 +358,7 @@ export default function Home() {
     if (target.action === "search") {
       if (worldFlags.includes("Downtown sedan searched")) addLog("The sedan has already been picked clean.");
       else {
+        audio.play("loot");
         setWorldFlags((flags) => [...flags, "Downtown sedan searched"]);
         setChips((value) => value + 4);
         addLog("You search the sedan: 4 chips and a damp parking receipt.", "good");
@@ -400,6 +413,7 @@ export default function Home() {
 
   const startCombat = () => {
     if (enemyHp <= 0) return;
+    audio.play("enemyAggro");
     setCombat("player");
     setAp(7);
     addLog("TURN 1 · The squirrel bares wet, yellow teeth.", "bad");
@@ -407,10 +421,12 @@ export default function Home() {
 
   const enemyTurn = async () => {
     setCombat("enemy");
+    audio.play("enemyAttack");
     await new Promise((resolve) => setTimeout(resolve, 650));
     const dodgeChance = skills.Survival * 4 + luck * 2;
     const roll = Math.floor(Math.random() * 100);
     if (roll < dodgeChance) {
+      audio.play("enemyNormal");
       addLog("You read the lunge and step aside.", "good");
     } else {
       const damage = 3 + Math.floor(Math.random() * 5);
@@ -429,12 +445,14 @@ export default function Home() {
       return;
     }
     setAp((v) => v - cost);
+    audio.play("shoot");
     const result = await spinFate(aimed ? "Aimed shot" : "Attack check");
     const hitTarget = 38 + skills.Guns * 7 + luck * 2 + (aimed ? 16 : 0);
     if (result.score <= hitTarget || result.jackpot) {
       const damage = 5 + skills.Guns + (aimed ? 3 : 0) + (result.jackpot ? 8 : 0);
       const remaining = Math.max(0, enemyHp - damage);
       setEnemyHp(remaining);
+      audio.play("enemyDamaged");
       addLog(`${aimed ? "AIMED" : "SNAP"} SHOT · ${damage} damage.`, "good");
       if (remaining === 0) {
         setCombat("won");
@@ -590,13 +608,29 @@ export default function Home() {
   };
 
   return (
-    <main className="game-shell">
+    <main className="game-shell" onClickCapture={(event) => {
+      const target = event.target as HTMLElement;
+      if (!mainMenu && target.closest("button")) audio.play("ui");
+    }}>
+      {mainMenu && <section className="main-menu" aria-label="Life is a Gamble main menu">
+        <div className="main-menu-card">
+          <small>100 YEARS AFTER THE FEDERAL SILENCE</small>
+          <h2>LIFE <i>IS A</i> GAMBLE</h2>
+          <p>Syracuse is awake. The radio is not.</p>
+          <div className={`radio-readout ${audio.ready ? "online" : ""}`}><b>{audio.ready ? "RADIO ONLINE · 89.7 WSTL" : "RADIO DORMANT"}</b><span>{audio.ready ? "Main theme transmitting" : "Activate audio to hear the title transmission"}</span></div>
+          <div className="main-menu-actions">
+            <button onClick={() => { void audio.activate("menu"); }}>{audio.ready ? "RESTART TITLE SIGNAL" : "WAKE THE RADIO"}</button>
+            <button className="enter-game" onClick={async () => { await audio.activate("menu"); audio.play("door"); setMainMenu(false); audio.setMusic("ambient"); }}>ENTER SYRACUSE</button>
+          </div>
+          <em>Original procedural score and sound effects · Headphones recommended</em>
+        </div>
+      </section>}
       <header className="topbar">
         <div className="brand-block">
           <span className="eyebrow">A POST-FEDERAL ROLE-PLAYING GAME</span>
           <h1>LIFE <i>IS A</i> GAMBLE</h1>
         </div>
-        <div className="location-block"><span>◈ CURRENT SECTOR</span><strong>{location}</strong></div>
+        <div className="location-block"><span>◈ CURRENT SECTOR</span><strong>{location}</strong><div className="audio-controls"><button onClick={audio.toggleMusic} aria-pressed={audio.musicOn}>MUSIC {audio.musicOn ? "ON" : "OFF"}</button><button onClick={audio.toggleSfx} aria-pressed={audio.sfxOn}>SFX {audio.sfxOn ? "ON" : "OFF"}</button></div></div>
         <div className="top-stats">
           <div><span>LEVEL</span><b>{level}</b></div>
           <div className="xp-stat"><span>XP {xp}/{xpGoal}</span><div><i style={{ width: `${(xp / xpGoal) * 100}%` }} /></div></div>
@@ -735,7 +769,7 @@ export default function Home() {
           <section className={`modal ${panel}`} role="dialog" aria-modal="true" aria-label={`${panel} panel`}>
             <button className="close" onClick={() => setPanel(null)} aria-label="Close panel">×</button>
 
-            {panel === "inventory" && <Inventory chips={chips} />}
+            {panel === "inventory" && <Inventory chips={chips} playEquip={() => audio.play("equip")} />}
             {panel === "skills" && <Skills level={level} skills={skills} points={skillPoints} upgrade={upgradeSkill} />}
             {panel === "map" && <WorldMap level={level} location={location} travel={travel} />}
             {panel === "dialogue" && (
@@ -788,7 +822,7 @@ function LegacyInventory({ chips }: { chips: number }) {
   </div>;
 }
 
-function Inventory({ chips }: { chips: number }) {
+function Inventory({ chips, playEquip }: { chips: number; playEquip: () => void }) {
   const [items, setItems] = useState<InventoryItem[]>(inventoryItems);
   const [selectedId, setSelectedId] = useState(inventoryItems[0].id);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -824,6 +858,7 @@ function Inventory({ chips }: { chips: number }) {
     const y = Math.max(0, Math.min(5, Math.floor((event.clientY - bounds.top) / (bounds.height / 6))));
     if (!canPlace(item, x, y)) setMessage("That space is blocked or too small for this item.");
     else {
+      if (item.equipped) playEquip();
       setItems((old) => old.map((entry) => entry.id === item.id ? { ...entry, x, y, equipped: null } : entry));
       setMessage(`${item.name} stowed at pack cell ${x + 1}, ${y + 1}.`);
     }
@@ -839,6 +874,7 @@ function Inventory({ chips }: { chips: number }) {
     if (!compatible) setMessage(`${item.name} does not fit the ${slot.replace("-", " ")} slot.`);
     else if (occupied) setMessage(`${slot.replace("-", " ")} is already occupied by ${occupied.name}.`);
     else {
+      playEquip();
       setItems((old) => old.map((entry) => entry.id === item.id ? { ...entry, equipped: slot } : entry));
       setMessage(`${item.name} equipped to ${slot.replace("-", " ")}.`);
     }
