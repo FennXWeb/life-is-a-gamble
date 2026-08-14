@@ -90,8 +90,10 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); o
 .player-entity { left:320px; top:312px; pointer-events:none; }
 .rowan-entity { left:155px; top:220px; }
 .squirrel-entity { left:448px; top:227px; }
-.sprite { width:88px; height:98px; background-image:url('/life-is-a-gamble-sprite-atlas.png'); background-size:500% 300%; background-repeat:no-repeat; border-radius:42% 42% 32% 32%; filter:drop-shadow(0 12px 8px #0009) saturate(.85) contrast(1.06); mix-blend-mode:multiply; }
+.sprite { width:88px; height:98px; background-image:url('/life-is-a-gamble-sprite-atlas-v2.png'); background-size:500% 300%; background-repeat:no-repeat; border-radius:0; filter:drop-shadow(0 12px 8px #0009) saturate(.85) contrast(1.06); mix-blend-mode:normal; }
 .courier-motion-sprite{position:absolute;z-index:2;left:-4px;top:-25px;width:96px;height:128px;background-image:url('/courier-motion-atlas.png');background-size:400% 200%;background-repeat:no-repeat;filter:drop-shadow(0 12px 8px #0009) saturate(.88) contrast(1.06);transform-origin:center bottom;image-rendering:auto}
+.decor-sprite{position:absolute;z-index:22;width:76px;height:76px;background-image:url('/syracuse-decor-atlas.png');background-size:400% 300%;background-repeat:no-repeat;pointer-events:none;transform:translate(-50%,-78%);filter:drop-shadow(4px 8px 6px #050605aa) saturate(.8) contrast(1.08)}
+.landmark-sprite{background-image:url('/syracuse-landmark-atlas.png');background-size:200% 200%;background-repeat:no-repeat;background-color:transparent;mix-blend-mode:normal;filter:drop-shadow(5px 9px 7px #050605aa)}
 .portrait .sprite,.npc-portrait .sprite { mix-blend-mode:normal; border-radius:0; }
 .entity-ring { position:absolute; width:62px; height:24px; border:2px solid #d2b066aa; border-radius:50%; bottom:2px; left:20px; box-shadow:0 0 10px #db9b39; }
 .squirrel-entity .entity-ring { border-color:#c04c36; box-shadow:0 0 10px #b33227; }
@@ -314,6 +316,35 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .downtown-player[data-facing="left"] .courier-motion-sprite{transform:scaleX(-1)}
 .downtown-player.running .entity-ring{animation-duration:.18s}
 @media(max-width:1250px){.modular-building{--cell-w:43px;--cell-h:42px}.modular-building.stone{--cell-w:43px;--cell-h:42px}.modular-building.metal{--cell-w:42px;--cell-h:40px}.build-market{left:22%}.build-corner{left:39%}.build-hall{right:12%}}
+
+/* Syracuse street wall v4: complete facades, sidewalk doors, and transparent street dressing. */
+.streetwall-row{position:absolute;z-index:14;left:-1%;right:-1%;bottom:54%;height:36%;display:flex;align-items:flex-end;gap:2px;min-width:980px;pointer-events:none;filter:drop-shadow(0 16px 13px #050605cc)}
+.streetwall-row .modular-building{position:relative!important;inset:auto!important;bottom:auto!important;left:auto!important;right:auto!important;top:auto!important;flex:var(--bays) 1 0;width:auto;height:calc(var(--floors) * 54px);min-width:0;transform:none!important;transform-origin:center bottom;filter:none;pointer-events:auto}
+.streetwall-row .modular-building::after{left:4%;right:-6%;bottom:-5%;height:22%;opacity:.7}
+.streetwall-row .building-face{border-width:2px 1px 3px}
+.streetwall-row .building-side{display:none}
+.streetwall-row .modular-building:last-child .building-side{display:grid;right:-25px;width:26px}
+.streetwall-row .building-roof{left:8px;right:-8px;top:-22px;height:24px}
+.streetwall-row .building-cornice{top:-4px;height:13px}
+.streetwall-row .building-sign{left:5px;right:auto;top:13px;bottom:auto;max-width:calc(100% - 10px);padding:3px 5px;background:#11130ff2}
+.streetwall-row .building-sign strong{font-size:clamp(5px,.43vw,8px);overflow:hidden;text-overflow:ellipsis}
+.streetwall-row .building-sign small{font-size:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.streetwall-row .building-door-cell{z-index:7;box-shadow:inset 0 -3px 0 #8c7045}
+.streetwall-row .building-door-cell::after{content:"ENTRY";position:absolute;left:2px;right:2px;bottom:1px;padding:2px 0;background:#131510e8;color:#d2ad61;font:700 5px monospace;letter-spacing:.08em;text-align:center;pointer-events:none}
+.streetwall-row .building-door-cell:hover{filter:brightness(1.4);box-shadow:inset 0 0 0 2px #e1b35b,0 0 10px #dc9f3e}
+.hotspot.prop .landmark-sprite{width:100%;height:100%}
+.landmark-sprite.city-prop{position:absolute;z-index:22;background-color:transparent;mix-blend-mode:normal}
+.barricade-prop{left:58%;bottom:15%;width:108px;height:96px}
+.tree-prop{left:30%;top:47%;width:82px;height:96px}
+.decor-hydrant-a{left:42%;top:54%}.decor-hydrant-b{left:62%;top:82%;width:66px;height:66px}
+.decor-payphone{left:3%;top:53%;width:88px;height:88px}.decor-mailbox-a{left:65%;top:53%}.decor-mailbox-b{left:94%;top:81%;width:68px;height:68px}
+.decor-trash-a{left:13%;top:52%;width:88px;height:88px}.decor-trash-b{left:87%;top:72%;width:82px;height:82px}
+.decor-news-a{left:34%;top:52%;width:70px;height:70px}.decor-news-b{left:77%;top:81%;width:66px;height:66px}
+.decor-barrels-a{left:7%;top:72%;width:86px;height:86px}.decor-barrels-b{left:48%;top:84%;width:82px;height:82px}
+.decor-bench-a{left:22%;top:52%;width:100px;height:82px}.decor-bench-b{left:84%;top:52%;width:96px;height:80px}
+.decor-cart{left:72%;top:72%;width:82px;height:82px}.decor-signal{left:46%;top:52%;width:96px;height:96px}
+.decor-sandbags{left:57%;top:83%;width:92px;height:82px}.decor-pole{left:68%;top:54%;width:104px;height:112px}.decor-sign{left:18%;top:79%;width:80px;height:86px}
+@media(max-width:1250px){.streetwall-row{min-width:930px;left:50%;right:auto;width:110%;transform:translateX(-50%)}.streetwall-row .modular-building{height:calc(var(--floors) * 49px)}.decor-sprite{transform:translate(-50%,-76%) scale(.88)}}
 
 /* Dynamic dialogue and consistent character voice layer. */
 .modal.dialogue{height:min(760px,88vh)}

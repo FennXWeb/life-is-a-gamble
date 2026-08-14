@@ -90,6 +90,14 @@ function EnvSprite({ row, col, label, className = "", style }: { row: number; co
   return <div className={`env-sprite ${className}`} role="img" aria-label={label} style={{ ...style, backgroundPosition: `${col * 33.333}% ${row * 33.333}%` }} />;
 }
 
+function DecorSprite({ row, col, label, className = "" }: { row: number; col: number; label: string; className?: string }) {
+  return <div className={`decor-sprite ${className}`} role="img" aria-label={label} style={{ backgroundPosition: `${col * 33.333}% ${row * 50}%` }} />;
+}
+
+function LandmarkSprite({ row, col, label, className = "" }: { row: number; col: number; label: string; className?: string }) {
+  return <div className={`landmark-sprite ${className}`} role="img" aria-label={label} style={{ backgroundPosition: `${col * 100}% ${row * 100}%` }} />;
+}
+
 function BuildingTile({ row, col, className = "" }: { row: number; col: number; className?: string }) {
   return <div className={`building-tile ${className}`} style={{ backgroundPosition: `${col * 33.333}% ${row * 50}%` }} />;
 }
@@ -141,7 +149,36 @@ const interactions: Record<string, InteractionTarget> = {
   cityHallDoor: { id: "city-hall-door", label: "Syracuse City Hall Records Annex", kind: "door", locked: true, lockpick: true, interior: "City Hall Records Annex" },
   sedan: { id: "rusted-sedan", label: "Abandoned Sedan", kind: "prop", action: "search" },
   lamp: { id: "erie-lamp", label: "Erie Boulevard Street Lamp", kind: "prop", action: "inspect" },
+  marketDoor: { id: "market-door", label: "Salina Market", kind: "door", inaccessible: true },
+  houseDoor: { id: "house-door", label: "Clinton House", kind: "door", inaccessible: true },
+  warehouseDoor: { id: "warehouse-door", label: "Armory Storage", kind: "door", inaccessible: true },
+  rowhouseDoor: { id: "rowhouse-door", label: "Hanover Row", kind: "door", inaccessible: true },
+  foundryDoor: { id: "foundry-door", label: "Salt City Foundry", kind: "door", inaccessible: true },
+  bankDoor: { id: "bank-door", label: "Onondaga Trust", kind: "door", inaccessible: true },
+  hotelDoor: { id: "hotel-door", label: "Empire Rooms", kind: "door", inaccessible: true },
+  saltworksDoor: { id: "saltworks-door", label: "Saltworks Exchange", kind: "door", inaccessible: true },
 };
+
+const cityDecor = [
+  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-a" },
+  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-b" },
+  { row: 0, col: 1, label: "Abandoned payphone", className: "decor-payphone" },
+  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-a" },
+  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-b" },
+  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-a" },
+  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-b" },
+  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-a" },
+  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-b" },
+  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-a" },
+  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-b" },
+  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-a" },
+  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-b" },
+  { row: 1, col: 3, label: "Overturned shopping cart", className: "decor-cart" },
+  { row: 2, col: 0, label: "Damaged traffic signal", className: "decor-signal" },
+  { row: 2, col: 1, label: "Stacked sandbags", className: "decor-sandbags" },
+  { row: 2, col: 2, label: "Leaning utility pole", className: "decor-pole" },
+  { row: 2, col: 3, label: "Broken municipal sign", className: "decor-sign" },
+];
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
@@ -596,22 +633,26 @@ export default function Home() {
               <div className="street-cracks"/><div className="drain drain-a"/><div className="drain drain-b"/>
             </div>
 
-            <ModularBuilding className="build-canal" name="ERIE CANAL MUSEUM" subtitle="MEMORY EXCHANGE · OPEN" material="brick" floors={3} bays={4} door={interactions.museumDoor} doorBay={2} damaged onInteract={openInteraction} />
-            <ModularBuilding className="build-hall" name="CITY HALL ANNEX" subtitle="RECORDS OFFICE · LOCKED" material="stone" floors={4} bays={4} door={interactions.cityHallDoor} doorBay={1} onInteract={openInteraction} />
-            <ModularBuilding className="build-theatre" name="LANDMARK THEATRE" subtitle="STRUCTURE UNSAFE" material="brick" floors={3} bays={5} door={interactions.theaterDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
-            <ModularBuilding className="build-provisioners" name="CLINTON PROVISIONERS" subtitle="TRADE GOODS · LOCKED" material="brick" floors={2} bays={4} door={interactions.supplyDoor} doorBay={1} storefront onInteract={openInteraction} />
-            <ModularBuilding className="build-warehouse" name="ARMORY STORAGE" subtitle="NO REGISTERED TENANT" material="metal" floors={2} bays={4} damaged onInteract={openInteraction} />
-            <ModularBuilding className="build-rowhouse" name="HANOVER ROW" subtitle="RESIDENTIAL CLAIM" material="brick" floors={3} bays={3} damaged onInteract={openInteraction} />
-            <ModularBuilding className="build-market" name="SALINA MARKET" subtitle="STALLS CLOSED AT DUSK" material="brick" floors={3} bays={5} storefront damaged onInteract={openInteraction} />
-            <ModularBuilding className="build-corner" name="CLINTON HOUSE" subtitle="ROOMS · WATER · RUMORS" material="brick" floors={4} bays={5} storefront onInteract={openInteraction} />
-            <ModularBuilding className="build-foundry" name="SALT CITY FOUNDRY" subtitle="SCRAP UNION LOCAL 8" material="metal" floors={3} bays={5} damaged onInteract={openInteraction} />
-            <ModularBuilding className="build-bank" name="ONONDAGA TRUST" subtitle="VAULT STATUS UNKNOWN" material="stone" floors={4} bays={4} damaged onInteract={openInteraction} />
+            <div className="streetwall-row" aria-label="North Fayette Street building frontage">
+              <ModularBuilding className="build-bank" name="ONONDAGA TRUST" subtitle="SEALED PROPERTY" material="stone" floors={4} bays={4} door={interactions.bankDoor} doorBay={1} damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-canal" name="ERIE CANAL MUSEUM" subtitle="MEMORY EXCHANGE · OPEN" material="brick" floors={3} bays={4} door={interactions.museumDoor} doorBay={2} damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-provisioners" name="CLINTON PROVISIONERS" subtitle="TRADE GOODS · LOCKED" material="brick" floors={2} bays={4} door={interactions.supplyDoor} doorBay={1} storefront onInteract={openInteraction} />
+              <ModularBuilding className="build-market" name="SALINA MARKET" subtitle="SHUTTERED" material="brick" floors={3} bays={5} door={interactions.marketDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-hotel" name="EMPIRE ROOMS" subtitle="CONDEMNED" material="stone" floors={4} bays={3} door={interactions.hotelDoor} doorBay={1} damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-corner" name="CLINTON HOUSE" subtitle="CLAIMED · NO ENTRY" material="brick" floors={4} bays={5} door={interactions.houseDoor} doorBay={3} storefront onInteract={openInteraction} />
+              <ModularBuilding className="build-hall" name="CITY HALL ANNEX" subtitle="RECORDS · LOCKED" material="stone" floors={4} bays={4} door={interactions.cityHallDoor} doorBay={1} onInteract={openInteraction} />
+              <ModularBuilding className="build-foundry" name="SALT CITY FOUNDRY" subtitle="UNION PROPERTY" material="metal" floors={3} bays={5} door={interactions.foundryDoor} doorBay={2} damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-theatre" name="LANDMARK THEATRE" subtitle="STRUCTURE UNSAFE" material="brick" floors={3} bays={5} door={interactions.theaterDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-warehouse" name="ARMORY STORAGE" subtitle="NO TENANT" material="metal" floors={2} bays={4} door={interactions.warehouseDoor} doorBay={2} damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-rowhouse" name="HANOVER ROW" subtitle="RESIDENTIAL CLAIM" material="brick" floors={3} bays={3} door={interactions.rowhouseDoor} doorBay={1} damaged onInteract={openInteraction} />
+              <ModularBuilding className="build-saltworks" name="SALTWORKS EXCHANGE" subtitle="BOARDED" material="brick" floors={3} bays={4} door={interactions.saltworksDoor} doorBay={2} storefront damaged onInteract={openInteraction} />
+            </div>
 
-            <button className="hotspot prop sedan-prop" onClick={(e) => openInteraction(e, interactions.sedan)} onContextMenu={(e) => openInteraction(e, interactions.sedan)} aria-label="Interact with abandoned sedan"><EnvSprite row={2} col={3} label="Rusted abandoned sedan" /></button>
-            <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with street lamp"><EnvSprite row={2} col={1} label="Bent street lamp" /></button>
-            <EnvSprite row={2} col={2} label="Scrap checkpoint barricade" className="city-prop barricade-prop" />
-            <EnvSprite row={3} col={2} label="Downtown rubble pile" className="city-prop rubble-prop" />
-            <EnvSprite row={3} col={3} label="Dead tree planter" className="city-prop tree-prop" />
+            <button className="hotspot prop sedan-prop" onClick={(e) => openInteraction(e, interactions.sedan)} onContextMenu={(e) => openInteraction(e, interactions.sedan)} aria-label="Interact with abandoned sedan"><LandmarkSprite row={0} col={0} label="Rusted abandoned sedan" /></button>
+            <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with street lamp"><LandmarkSprite row={0} col={1} label="Bent street lamp" /></button>
+            <LandmarkSprite row={1} col={0} label="Scrap checkpoint barricade" className="city-prop barricade-prop" />
+            <LandmarkSprite row={1} col={1} label="Dead tree planter" className="city-prop tree-prop" />
+            {cityDecor.map((decor, index) => <DecorSprite key={`${decor.className}-${index}`} {...decor} />)}
 
             <div className="walk-destination" style={{ left: `${destination.x}%`, top: `${destination.y}%` }} />
             <div className={`downtown-player ${walking ? `walking ${movementMode}` : ""}`} data-facing={walkFacing} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
@@ -633,7 +674,7 @@ export default function Home() {
             <EnvSprite row={1} col={0} label="Interior brick wall" className="interior-brick" />
             <EnvSprite row={2} col={2} label="Interior scrap counter" className="interior-counter" />
             <div className="interior-card"><small>INTERIOR CELL</small><h2>{interior}</h2><p>{interior.includes("Museum") ? "Stacks of canal manifests survive behind steel mesh. Someone has circled Albany-bound shipments in red grease pencil." : interior.includes("City Hall") ? "Municipal ledgers cover the desks. The last entry is dated three weeks after the Federal Silence began." : "Shelves of canned roots and shotgun shells line the old storefront. The shopkeeper is elsewhere—for now."}</p><button onClick={(e) => { e.stopPropagation(); setInterior(null); setLocation("Downtown Syracuse — Clinton Square"); addLog(`Exited ${interior}.`); }}>EXIT TO STREET</button></div>
-            <div className="interior-player"><Sprite row={0} col={0} label="Courier inside building" /><div className="entity-ring" /></div>
+            <div className="interior-player"><CourierMotionSprite mode="idle" frame={0} label="Courier inside building" /><div className="entity-ring" /></div>
           </div>}
 
           {contextMenu && <div className="interaction-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}>
