@@ -91,6 +91,7 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); o
 .rowan-entity { left:155px; top:220px; }
 .squirrel-entity { left:448px; top:227px; }
 .sprite { width:88px; height:98px; background-image:url('/life-is-a-gamble-sprite-atlas.png'); background-size:500% 300%; background-repeat:no-repeat; border-radius:42% 42% 32% 32%; filter:drop-shadow(0 12px 8px #0009) saturate(.85) contrast(1.06); mix-blend-mode:multiply; }
+.courier-motion-sprite{position:absolute;z-index:2;left:-4px;top:-25px;width:96px;height:128px;background-image:url('/courier-motion-atlas.png');background-size:400% 200%;background-repeat:no-repeat;filter:drop-shadow(0 12px 8px #0009) saturate(.88) contrast(1.06);transform-origin:center bottom;image-rendering:auto}
 .portrait .sprite,.npc-portrait .sprite { mix-blend-mode:normal; border-radius:0; }
 .entity-ring { position:absolute; width:62px; height:24px; border:2px solid #d2b066aa; border-radius:50%; bottom:2px; left:20px; box-shadow:0 0 10px #db9b39; }
 .squirrel-entity .entity-ring { border-color:#c04c36; box-shadow:0 0 10px #b33227; }
@@ -310,6 +311,8 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .sedan-prop{right:29%;bottom:20%;width:112px;height:82px;z-index:23}.lamp-prop{left:38%;top:48%;width:50px;height:78px;z-index:24}.barricade-prop{left:60%;bottom:18%;width:88px;height:72px;z-index:22}.rubble-prop{right:7%;top:46%;width:84px;height:67px;z-index:22}.tree-prop{left:31%;top:38%;width:72px;height:90px;z-index:20}
 .downtown-rowan{left:38%;top:72%}.downtown-squirrel{left:66%;top:78%}
 .map-pin.disabled{filter:grayscale(1);opacity:.43;cursor:not-allowed;color:#332d24;text-shadow:none}.map-pin.disabled i{background:#3d3b35;box-shadow:none}.map-pin.disabled:hover{color:#332d24}.map-pin.disabled:hover i{background:#3d3b35;box-shadow:none}.map-pin.disabled small{color:#4b3028;font-weight:900}
+.downtown-player[data-facing="left"] .courier-motion-sprite{transform:scaleX(-1)}
+.downtown-player.running .entity-ring{animation-duration:.18s}
 @media(max-width:1250px){.modular-building{--cell-w:43px;--cell-h:42px}.modular-building.stone{--cell-w:43px;--cell-h:42px}.modular-building.metal{--cell-w:42px;--cell-h:40px}.build-market{left:22%}.build-corner{left:39%}.build-hall{right:12%}}
 
 /* Dynamic dialogue and consistent character voice layer. */

@@ -73,6 +73,19 @@ function Sprite({ row, col, label, className = "" }: { row: number; col: number;
   );
 }
 
+function CourierMotionSprite({ mode, frame, label }: { mode: "idle" | "walk" | "run"; frame: number; label: string }) {
+  const row = mode === "run" ? 1 : 0;
+  const col = mode === "idle" ? 1 : frame;
+  return (
+    <div
+      className="courier-motion-sprite"
+      role="img"
+      aria-label={label}
+      style={{ backgroundPosition: `${col * 33.333}% ${row * 100}%` }}
+    />
+  );
+}
+
 function EnvSprite({ row, col, label, className = "", style }: { row: number; col: number; label: string; className?: string; style?: CSSProperties }) {
   return <div className={`env-sprite ${className}`} role="img" aria-label={label} style={{ ...style, backgroundPosition: `${col * 33.333}% ${row * 33.333}%` }} />;
 }
@@ -155,7 +168,8 @@ export default function Home() {
   const [playerPosition, setPlayerPosition] = useState({ x: 51, y: 71 });
   const [destination, setDestination] = useState({ x: 51, y: 71 });
   const [walking, setWalking] = useState(false);
-  const [walkFrame, setWalkFrame] = useState(1);
+  const [walkFrame, setWalkFrame] = useState(0);
+  const [movementMode, setMovementMode] = useState<"walk" | "run">("walk");
   const [walkFacing, setWalkFacing] = useState<"left" | "right">("right");
   const [walkDuration, setWalkDuration] = useState(500);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: InteractionTarget } | null>(null);
@@ -211,12 +225,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!walking) return;
-    const timer = setInterval(() => setWalkFrame((frame) => frame === 1 ? 2 : 1), 145);
+    const timer = setInterval(() => setWalkFrame((frame) => (frame + 1) % 4), movementMode === "run" ? 90 : 135);
     return () => clearInterval(timer);
-  }, [walking]);
+  }, [walking, movementMode]);
 
   const xpGoal = level * 100;
-  const currentFrame = walking ? walkFrame : combat === "player" ? 3 : combat === "enemy" ? 4 : 0;
+  const combatFrame = combat === "player" ? 3 : combat === "enemy" ? 4 : null;
   const squirrelFrame = enemyHp <= 0 ? 4 : combat === "enemy" ? 3 : isSpinning ? 1 : 0;
 
   const addLog = (text: string, tone: LogEntry["tone"] = "plain") => {
@@ -239,11 +253,16 @@ export default function Home() {
       return;
     }
     const distance = Math.hypot((x - playerPosition.x) * bounds.width / 100, (y - playerPosition.y) * bounds.height / 100);
-    const duration = Math.max(240, Math.min(1700, distance * 3.5));
+    const nextMovementMode = distance > 260 ? "run" : "walk";
+    const duration = nextMovementMode === "run"
+      ? Math.max(220, Math.min(1150, distance * 2.05))
+      : Math.max(240, Math.min(1700, distance * 3.5));
     setContextMenu(null);
     setWalkFacing(x < playerPosition.x ? "left" : "right");
     setDestination({ x, y });
     setWalkDuration(duration);
+    setMovementMode(nextMovementMode);
+    setWalkFrame(0);
     setWalking(true);
     setPlayerPosition({ x, y });
     if (walkTimer.current) clearTimeout(walkTimer.current);
@@ -595,9 +614,11 @@ export default function Home() {
             <EnvSprite row={3} col={3} label="Dead tree planter" className="city-prop tree-prop" />
 
             <div className="walk-destination" style={{ left: `${destination.x}%`, top: `${destination.y}%` }} />
-            <div className={`downtown-player ${walking ? "walking" : ""}`} data-facing={walkFacing} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
-              <div className="status-tag you">YOU {walking ? "· WALKING" : "· READY"}</div>
-              <Sprite row={0} col={currentFrame} label="Courier walking through downtown Syracuse" />
+            <div className={`downtown-player ${walking ? `walking ${movementMode}` : ""}`} data-facing={walkFacing} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
+              <div className="status-tag you">YOU {walking ? `· ${movementMode === "run" ? "RUNNING" : "WALKING"}` : "· READY"}</div>
+              {combatFrame === null
+                ? <CourierMotionSprite mode={walking ? movementMode : "idle"} frame={walkFrame} label={`Courier ${walking ? movementMode : "standing"} in downtown Syracuse`} />
+                : <Sprite row={0} col={combatFrame} label="Courier in combat in downtown Syracuse" />}
               <div className="entity-ring" />
             </div>
 
