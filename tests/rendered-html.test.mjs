@@ -14,6 +14,24 @@ async function render() {
   );
 }
 
+async function dialogue(message, overrides = {}) {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("dialogue-test", `${process.pid}-${Date.now()}-${Math.random()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const game = {
+    hp: 32, maxHp: 32, ap: 7, enemyHp: 18, rowanHp: 26, combat: "idle", combatTarget: null,
+    selectedNpc: "rowan", level: 1, xp: 35, xpGoal: 100, chips: 37, skillPoints: 2,
+    unlockedDoors: [], interior: null, playerPosition: { x: 51, y: 71 }, inventory: [], quests: [],
+    companions: [{ id: "rowan", name: "Rowan Vale", role: "Scout", status: "available", loyalty: 24, morale: 58, hp: 26, maxHp: 26, opinion: "Wary", abilities: [], history: [] }],
+    ...overrides.game,
+  };
+  return worker.fetch(new Request("http://localhost/api/dialogue", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, npc: { trust: 30, respect: 28, fear: 5, mood: "Wary", opinion: "Testing", memories: [] }, skills: { Speech: 4 }, luck: 6, slot: 12, worldFlags: [], location: "Downtown Syracuse", history: [], game, ...overrides }),
+  }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
+}
+
 test("server-renders the Life is a Gamble game shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -70,4 +88,33 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
   assert.match(page, /facade=\{\{ kind: "landmark", id: "syracuse-city-hall" \}\}/);
   assert.match(css, /\.building-facade-art\.storefront/);
   assert.match(css, /\.sign-landmark-theatre/);
+});
+
+test("dialogue can create validated quests and recruit a companion", async () => {
+  const questResponse = await dialogue("Do you have a job for me?");
+  assert.equal(questResponse.status, 200);
+  const questTurn = await questResponse.json();
+  assert.ok(questTurn.actions.some((action) => action.type === "create_quest" && action.target.startsWith("weighlock-dead-drop|")));
+
+  const recruitResponse = await dialogue("Come with me. Travel together as companions.");
+  assert.equal(recruitResponse.status, 200);
+  const recruitTurn = await recruitResponse.json();
+  assert.ok(recruitTurn.actions.some((action) => action.type === "add_companion" && action.target === "rowan"));
+});
+
+test("quest and companion systems are persisted, visible, and included in AI context", async () => {
+  const [page, contract, route, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/dialogue-contract.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/dialogue/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /const \[quests, setQuests\]/);
+  assert.match(page, /const \[companions, setCompanions\]/);
+  assert.match(page, /<Journal quests=\{quests\} companions=\{companions\}/);
+  assert.match(contract, /"create_quest"/);
+  assert.match(contract, /"modify_companion"/);
+  assert.match(route, /including every active quest and Rowan's companion record/);
+  assert.match(css, /\.journal-columns/);
+  assert.match(css, /\.companion-hud/);
 });

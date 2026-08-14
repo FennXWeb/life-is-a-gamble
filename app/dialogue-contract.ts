@@ -16,6 +16,13 @@ export const dialogueActionTypes = [
   "remove_item",
   "equip_item",
   "open_panel",
+  "create_quest",
+  "edit_quest",
+  "complete_quest",
+  "fail_quest",
+  "add_companion",
+  "remove_companion",
+  "modify_companion",
   "close_dialogue",
 ] as const;
 
@@ -43,6 +50,35 @@ export type DialogueTurn = {
   engine?: "ai" | "local";
 };
 
+export type QuestStatus = "active" | "completed" | "failed";
+export type QuestObjective = { id: string; text: string; complete: boolean };
+export type QuestState = {
+  id: string;
+  title: string;
+  description: string;
+  giver: string;
+  status: QuestStatus;
+  objectives: QuestObjective[];
+  rewardXp: number;
+  history: string[];
+  updatedAt: number;
+};
+
+export type CompanionStatus = "available" | "active" | "dismissed" | "hostile" | "dead";
+export type CompanionState = {
+  id: "rowan";
+  name: string;
+  role: string;
+  status: CompanionStatus;
+  loyalty: number;
+  morale: number;
+  hp: number;
+  maxHp: number;
+  opinion: string;
+  abilities: string[];
+  history: string[];
+};
+
 export type DialogueGameSnapshot = {
   hp: number;
   maxHp: number;
@@ -61,6 +97,8 @@ export type DialogueGameSnapshot = {
   interior: string | null;
   playerPosition: { x: number; y: number };
   inventory: Array<{ id: number; name: string; equipped: string | null }>;
+  quests: QuestState[];
+  companions: CompanionState[];
 };
 
 export const dialogueTurnSchema = {
@@ -83,7 +121,7 @@ export const dialogueTurnSchema = {
     conversationStatus: { type: "string", enum: ["continue", "refuse", "end"] },
     actions: {
       type: "array",
-      maxItems: 4,
+      maxItems: 6,
       items: {
         type: "object",
         additionalProperties: false,
@@ -112,7 +150,7 @@ export function normalizeDialogueTurn(value: unknown): DialogueTurn | null {
   const reply = String(candidate.reply || "").trim();
   if (!reply) return null;
   const rawActions = Array.isArray(candidate.actions) ? candidate.actions : [];
-  const actions = rawActions.slice(0, 4).flatMap((entry): DialogueAction[] => {
+  const actions = rawActions.slice(0, 6).flatMap((entry): DialogueAction[] => {
     if (!entry || typeof entry !== "object") return [];
     const action = entry as Record<string, unknown>;
     const type = String(action.type || "");

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useGameAudio } from "./game-audio";
-import type { DialogueAction, DialogueGameSnapshot, DialogueTurn } from "./dialogue-contract";
+import type { CompanionState, DialogueAction, DialogueGameSnapshot, DialogueTurn, QuestState } from "./dialogue-contract";
 
-type Panel = "inventory" | "skills" | "map" | "dialogue" | "help" | null;
+type Panel = "inventory" | "skills" | "map" | "journal" | "dialogue" | "help" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
 type NpcId = "rowan" | "squirrel";
 type LogEntry = { id: number; tone: "system" | "good" | "bad" | "plain"; text: string };
@@ -157,6 +157,30 @@ const cities = [
 const playableCity = "Syracuse";
 
 const initialSkills = { Guns: 3, Barter: 2, Speech: 3, Survival: 4, Medicine: 1, Mechanics: 2 };
+const initialQuests: QuestState[] = [{
+  id: "salt-yard-pest",
+  title: "Rabid in the Ruins",
+  description: "A fever-maddened squirrel is stalking the Fayette Street crossing. Put it down before it reaches the occupied blocks.",
+  giver: "Salt Yard survivors",
+  status: "active",
+  objectives: [{ id: "salt-yard-pest-1", text: "Kill the rabid squirrel near Armory Alley", complete: false }],
+  rewardXp: 30,
+  history: ["The Courier encountered the animal in downtown Syracuse."],
+  updatedAt: 1,
+}];
+const initialCompanions: CompanionState[] = [{
+  id: "rowan",
+  name: "Rowan Vale",
+  role: "Scout · Survival / Speech",
+  status: "available",
+  loyalty: 18,
+  morale: 58,
+  hp: 26,
+  maxHp: 26,
+  opinion: "Watching to see what the Courier does when the plan breaks.",
+  abilities: ["Roadwise: +5% ranged accuracy", "Second Barrel: +2 damage against non-human threats"],
+  history: ["Met the Courier at the Salt Yard."],
+}];
 const reelSymbols = ["♠", "7", "☢", "♦", "★", "BAR"];
 
 type EquipSlot = "head" | "torso" | "legs" | "hands" | "feet" | "holster-left" | "holster-right";
@@ -363,6 +387,10 @@ function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
+function parseActionTarget(target: string) {
+  return target.split("|").map((part) => part.trim());
+}
+
 export default function Home() {
   const audio = useGameAudio();
   const [mainMenu, setMainMenu] = useState(true);
@@ -407,6 +435,8 @@ export default function Home() {
   const [speakingCharacter, setSpeakingCharacter] = useState<"YOU" | "ROWAN" | null>(null);
   const [dialogueEngine, setDialogueEngine] = useState<"ai" | "local" | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>(inventoryItems);
+  const [quests, setQuests] = useState<QuestState[]>(initialQuests);
+  const [companions, setCompanions] = useState<CompanionState[]>(initialCompanions);
   const [saveReady, setSaveReady] = useState(false);
   const [npc, setNpc] = useState<NpcState>({
     trust: 18,
@@ -433,6 +463,8 @@ export default function Home() {
   const jackpotTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceQueue = useRef<Promise<void>>(Promise.resolve());
   const activeAudio = useRef<HTMLAudioElement | null>(null);
+  const createdQuestIds = useRef(new Set<string>());
+  const resolvedQuestIds = useRef(new Set<string>());
 
   useEffect(() => {
     try {
@@ -447,6 +479,8 @@ export default function Home() {
       if (save.worldFlags) setWorldFlags(save.worldFlags);
       if (Array.isArray(save.conversation)) setConversation(save.conversation.slice(-40));
       if (Array.isArray(save.inventory) && save.inventory.length) setInventory(save.inventory);
+      if (Array.isArray(save.quests)) setQuests(save.quests);
+      if (Array.isArray(save.companions)) setCompanions(save.companions);
       if (typeof save.hp === "number") setHp(save.hp);
       if (typeof save.maxHp === "number") setMaxHp(save.maxHp);
       if (typeof save.ap === "number") setAp(save.ap);
@@ -467,9 +501,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!saveReady) return;
-    const save = { level, xp, chips, skills, skillPoints, npc, worldFlags, conversation: conversation.slice(-40), location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory };
+    const save = { level, xp, chips, skills, skillPoints, npc, worldFlags, conversation: conversation.slice(-40), location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory, quests, companions };
     localStorage.setItem("life-is-a-gamble-save", JSON.stringify(save));
-  }, [saveReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory]);
+  }, [saveReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory, quests, companions]);
 
   useEffect(() => {
     if (!walking) return;
@@ -669,6 +703,36 @@ export default function Home() {
     });
   };
 
+  const finishQuest = (questId: string, status: "completed" | "failed", reason: string) => {
+    if (resolvedQuestIds.current.has(questId)) return null;
+    const quest = quests.find((entry) => entry.id === questId && entry.status === "active");
+    if (!quest) return null;
+    resolvedQuestIds.current.add(questId);
+    setQuests((entries) => entries.map((entry) => entry.id === questId ? {
+      ...entry,
+      status,
+      objectives: status === "completed" ? entry.objectives.map((objective) => ({ ...objective, complete: true })) : entry.objectives,
+      history: [...entry.history, reason].slice(-10),
+      updatedAt: Date.now(),
+    } : entry));
+    if (status === "completed" && quest.rewardXp > 0) awardXp(quest.rewardXp);
+    return `QUEST ${status === "completed" ? "COMPLETED" : "FAILED"} · ${quest.title}${status === "completed" && quest.rewardXp ? ` · +${quest.rewardXp} XP` : ""}`;
+  };
+
+  const activeCompanion = companions.find((companion) => companion.status === "active");
+
+  const setCompanionStatus = (id: string, status: CompanionState["status"], reason: string) => {
+    const current = companions.find((companion) => companion.id === id);
+    if (!current || current.status === "dead" || current.status === status) return null;
+    setCompanions((entries) => entries.map((companion) => companion.id === id ? {
+      ...companion,
+      status,
+      opinion: reason,
+      history: [...companion.history, reason].slice(-10),
+    } : companion));
+    return `${status === "active" ? "COMPANION JOINED" : status === "dismissed" ? "COMPANION DISMISSED" : "COMPANION STATUS"} · ${current.name}`;
+  };
+
   const spinFate = async (reason: string): Promise<{ score: number; jackpot: boolean; symbols: string[] }> => {
     if (isSpinning) return { score: 0, jackpot: false, symbols: reels };
     setIsSpinning(true);
@@ -718,6 +782,7 @@ export default function Home() {
     if (target === "rowan") {
       if (!worldFlags.includes("Courier attacked Rowan")) setWorldFlags((flags) => [...flags, "Courier attacked Rowan"]);
       setNpc((state) => ({ ...state, trust: clamp(state.trust - 24), respect: clamp(state.respect - 8), fear: clamp(state.fear + 18), mood: "Hostile", opinion: "You drew on me. Whatever this was before, it is over.", memories: [...state.memories.slice(-7), "The Courier raised a weapon against me."] }));
+      setCompanions((entries) => entries.map((companion) => companion.id === "rowan" && companion.status !== "dead" ? { ...companion, status: "hostile", loyalty: 0, morale: clamp(companion.morale - 30), opinion: "The Courier betrayed me at gunpoint.", history: [...companion.history, "The Courier attacked Rowan."].slice(-10) } : companion));
       setPanel(null);
       addLog("HOSTILITIES · Rowan reaches for her sidearm.", "bad");
     } else addLog("TURN 1 · The squirrel bares wet, yellow teeth.", "bad");
@@ -763,9 +828,10 @@ export default function Home() {
     setAp(availableAp - cost);
     audio.play("shoot");
     const result = await spinFate(aimed ? "Aimed shot" : "Attack check");
-    const hitTarget = 38 + skills.Guns * 7 + luck * 2 + (aimed ? 16 : 0);
+    const companionAssist = activeCompanion?.id === "rowan" && target === "squirrel";
+    const hitTarget = 38 + skills.Guns * 7 + luck * 2 + (aimed ? 16 : 0) + (companionAssist ? 5 : 0);
     if (result.score <= hitTarget || result.jackpot) {
-      const damage = 5 + skills.Guns + (aimed ? 3 : 0) + (result.jackpot ? 8 : 0);
+      const damage = 5 + skills.Guns + (aimed ? 3 : 0) + (result.jackpot ? 8 : 0) + (companionAssist ? 2 : 0);
       const remaining = Math.max(0, targetHp - damage);
       if (target === "rowan") setRowanHp(remaining);
       else setEnemyHp(remaining);
@@ -776,12 +842,16 @@ export default function Home() {
         if (target === "rowan") {
           awardXp(40);
           setWorldFlags((flags) => [...new Set([...flags, "Rowan killed by Courier"])]);
+          setCompanions((entries) => entries.map((companion) => companion.id === "rowan" ? { ...companion, status: "dead", hp: 0, loyalty: 0, morale: 0, opinion: "Dead.", history: [...companion.history, "Killed by the Courier in downtown Syracuse."].slice(-10) } : companion));
+          setQuests((entries) => entries.map((quest) => quest.giver === "Rowan Vale" && quest.status === "active" ? { ...quest, status: "failed", history: [...quest.history, "Failed when Rowan Vale was killed."].slice(-10), updatedAt: Date.now() } : quest));
           addLog("ROWAN FALLS · +40 XP · Her story ends here.", "bad");
         } else {
           setChips((v) => v + 6);
           awardXp(65);
           if (!worldFlags.includes("Salt Yard squirrel killed")) setWorldFlags((v) => [...v, "Salt Yard squirrel killed"]);
           addLog("ENCOUNTER WON · +65 XP · +6 chips · Squirrel Tail found.", "good");
+          const questEffect = finishQuest("salt-yard-pest", "completed", "The Courier killed the rabid squirrel at Armory Alley.");
+          if (questEffect) addLog(questEffect, "good");
         }
         return;
       }
@@ -923,6 +993,8 @@ export default function Home() {
         if (!remaining) {
           setCombat("won");
           setWorldFlags((flags) => [...new Set([...flags, "Rowan killed the Salt Yard squirrel"])]);
+          const questEffect = finishQuest("salt-yard-pest", "completed", "Rowan killed the rabid squirrel during the conversation.");
+          if (questEffect) addLog(questEffect, "good");
         }
         return `ROWAN ATTACKS · ${damage} damage${remaining ? "" : " · enemy defeated"}`;
       }
@@ -1003,9 +1075,75 @@ export default function Home() {
         return `EQUIPPED · ${item.name}`;
       }
       case "open_panel":
-        if (!["inventory", "skills", "map", "help"].includes(action.target)) return null;
+        if (!["inventory", "skills", "map", "journal", "help"].includes(action.target)) return null;
         window.setTimeout(() => setPanel(action.target as Panel), 900);
         return `OPENING ${action.target.toUpperCase()} · ${action.reason}`;
+      case "create_quest": {
+        const [id, title, firstObjective] = parseActionTarget(action.target);
+        if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(id || "") || !title || !firstObjective || quests.some((quest) => quest.id === id) || createdQuestIds.current.has(id)) return null;
+        createdQuestIds.current.add(id);
+        const rewardXp = Math.max(5, Math.min(75, amount || 15));
+        const quest: QuestState = {
+          id,
+          title: title.slice(0, 64),
+          description: action.reason.slice(0, 220),
+          giver: "Rowan Vale",
+          status: "active",
+          objectives: [{ id: `${id}-1`, text: firstObjective.slice(0, 120), complete: false }],
+          rewardXp,
+          history: [`Quest accepted through dialogue with Rowan: ${action.reason}`],
+          updatedAt: Date.now(),
+        };
+        setQuests((entries) => [...entries, quest]);
+        return `NEW QUEST · ${quest.title}`;
+      }
+      case "edit_quest": {
+        const [id, operation, value] = parseActionTarget(action.target);
+        const quest = quests.find((entry) => entry.id === id && entry.status === "active");
+        if (!quest || !operation || !value) return null;
+        const validOperations = ["title", "description", "add_objective", "complete_objective", "remove_objective"];
+        if (!validOperations.includes(operation)) return null;
+        setQuests((entries) => entries.map((entry) => {
+          if (entry.id !== id) return entry;
+          let objectives = entry.objectives;
+          let title = entry.title;
+          let description = entry.description;
+          if (operation === "title") title = value.slice(0, 64);
+          if (operation === "description") description = value.slice(0, 220);
+          if (operation === "add_objective" && !objectives.some((objective) => objective.text.toLowerCase() === value.toLowerCase())) objectives = [...objectives, { id: `${id}-${Date.now()}`, text: value.slice(0, 120), complete: false }];
+          if (operation === "complete_objective") objectives = objectives.map((objective, index) => objective.id === value || String(index + 1) === value || objective.text.toLowerCase().includes(value.toLowerCase()) ? { ...objective, complete: true } : objective);
+          if (operation === "remove_objective" && objectives.length > 1) objectives = objectives.filter((objective, index) => objective.id !== value && String(index + 1) !== value && !objective.text.toLowerCase().includes(value.toLowerCase()));
+          return { ...entry, title, description, objectives, history: [...entry.history, action.reason].slice(-10), updatedAt: Date.now() };
+        }));
+        return `QUEST UPDATED · ${quest.title} · ${action.reason}`;
+      }
+      case "complete_quest":
+        return finishQuest(action.target, "completed", action.reason);
+      case "fail_quest":
+        return finishQuest(action.target, "failed", action.reason);
+      case "add_companion":
+        if (action.target !== "rowan" || npc.trust < 20 || worldFlags.includes("Rowan became hostile")) return null;
+        return setCompanionStatus("rowan", "active", action.reason);
+      case "remove_companion":
+        if (action.target !== "rowan") return null;
+        return setCompanionStatus("rowan", "dismissed", action.reason);
+      case "modify_companion": {
+        const [id, field] = parseActionTarget(action.target);
+        const companion = companions.find((entry) => entry.id === id && entry.status !== "dead");
+        if (!companion || !["loyalty", "morale", "hp"].includes(field)) return null;
+        const change = Math.max(-20, Math.min(20, amount));
+        if (field === "hp") setRowanHp(Math.max(0, Math.min(companion.maxHp, companion.hp + change)));
+        setCompanions((entries) => entries.map((entry) => {
+          if (entry.id !== id) return entry;
+          if (field === "hp") {
+            const nextHp = Math.max(0, Math.min(entry.maxHp, entry.hp + change));
+            return { ...entry, hp: nextHp, status: nextHp === 0 ? "dead" : entry.status, opinion: action.reason, history: [...entry.history, action.reason].slice(-10) };
+          }
+          if (field === "loyalty") return { ...entry, loyalty: clamp(entry.loyalty + change), opinion: action.reason, history: [...entry.history, action.reason].slice(-10) };
+          return { ...entry, morale: clamp(entry.morale + change), opinion: action.reason, history: [...entry.history, action.reason].slice(-10) };
+        }));
+        return `COMPANION ${field.toUpperCase()} ${change >= 0 ? "+" : ""}${change} · ${companion.name}`;
+      }
       case "close_dialogue":
         window.setTimeout(() => setPanel(null), 1200);
         return "CONVERSATION ENDED";
@@ -1033,6 +1171,8 @@ export default function Home() {
             hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, level, xp, xpGoal, chips, skillPoints,
             unlockedDoors, interior, playerPosition,
             inventory: inventory.map((item) => ({ id: item.id, name: item.name, equipped: item.equipped })),
+            quests,
+            companions,
           } satisfies DialogueGameSnapshot,
         }),
       });
@@ -1048,6 +1188,13 @@ export default function Home() {
         opinion: turn.opinion || old.opinion,
         memories: [...old.memories, turn.memory || `You said: ${message}`].slice(-12),
       }));
+      setCompanions((entries) => entries.map((companion) => companion.id === "rowan" && companion.status !== "dead" && companion.status !== "hostile" ? {
+        ...companion,
+        loyalty: clamp(companion.loyalty + Math.round(Number(turn.trustDelta || 0) / 2)),
+        morale: clamp(companion.morale + Math.round(Number(turn.respectDelta || 0) / 2) - Math.max(0, Number(turn.fearDelta || 0))),
+        opinion: turn.opinion || companion.opinion,
+        history: turn.memory ? [...companion.history, turn.memory].slice(-10) : companion.history,
+      } : companion));
       const effects = (turn.actions || []).map(applyDialogueAction).filter((effect): effect is string => Boolean(effect));
       effects.forEach((effect) => addLog(effect, effect.includes("FAILED") ? "bad" : "system"));
       const checkText = effects.length ? effects.join(" · ") : turn.actionCheck || "No immediate world change.";
@@ -1114,6 +1261,7 @@ export default function Home() {
           <button className={panel === "map" ? "active" : ""} onClick={() => setPanel(panel === "map" ? null : "map")}><b>◉</b><span>WORLD</span><em>M</em></button>
           <button className={panel === "inventory" ? "active" : ""} onClick={() => setPanel(panel === "inventory" ? null : "inventory")}><b>▦</b><span>PACK</span><em>I</em></button>
           <button className={panel === "skills" ? "active" : ""} onClick={() => setPanel(panel === "skills" ? null : "skills")}><b>✦</b><span>SKILLS</span><em>K</em></button>
+          <button className={panel === "journal" ? "active" : ""} onClick={() => setPanel(panel === "journal" ? null : "journal")}><b>◆</b><span>JOURNAL</span><em>J</em></button>
           <button className={panel === "help" ? "active" : ""} onClick={() => setPanel(panel === "help" ? null : "help")}><b>?</b><span>CODEX</span><em>H</em></button>
         </aside>
 
@@ -1227,6 +1375,12 @@ export default function Home() {
             <div><small>THE COURIER</small><strong>Drifter, Level {level}</strong><div className="meter hp"><i style={{ width: `${(hp / maxHp) * 100}%` }} /><span>HP {hp}/{maxHp}</span></div></div>
           </section>
 
+          <button className={`companion-hud ${activeCompanion ? "active" : ""}`} onClick={() => setPanel("journal")}>
+            <span>{activeCompanion ? "ACTIVE COMPANION" : "COMPANION SLOT"}</span>
+            <strong>{activeCompanion?.name || "NO ONE TRAVELLING"}</strong>
+            <em>{activeCompanion ? `HP ${activeCompanion.hp}/${activeCompanion.maxHp} · LOYALTY ${activeCompanion.loyalty}` : "Talk to Rowan about travelling together"}</em>
+          </button>
+
           <section className="turn-panel">
             <div className="section-heading"><span>{combat === "player" ? "YOUR TURN" : combat === "enemy" ? "ENEMY TURN" : "FIELD ACTIONS"}</span><b>{ap} AP</b></div>
             <div className="ap-pips">{Array.from({ length: 7 }, (_, i) => <i key={i} className={i < ap ? "filled" : ""} />)}</div>
@@ -1272,6 +1426,10 @@ export default function Home() {
             {panel === "inventory" && <Inventory chips={chips} playEquip={() => audio.play("equip")} items={inventory} setItems={setInventory} />}
             {panel === "skills" && <Skills level={level} skills={skills} points={skillPoints} upgrade={upgradeSkill} />}
             {panel === "map" && <WorldMap level={level} location={location} travel={travel} />}
+            {panel === "journal" && <Journal quests={quests} companions={companions} dismiss={(id) => {
+              const effect = setCompanionStatus(id, "dismissed", "The Courier asked Rowan to wait in downtown Syracuse.");
+              if (effect) addLog(effect, "system");
+            }} />}
             {panel === "dialogue" && (
               <Dialogue
                 npc={npc}
@@ -1285,6 +1443,8 @@ export default function Home() {
                 speakingCharacter={speakingCharacter}
                 toggleVoice={toggleVoice}
                 engine={dialogueEngine}
+                activeQuestCount={quests.filter((quest) => quest.status === "active").length}
+                companionStatus={companions.find((companion) => companion.id === "rowan")?.status || "available"}
               />
             )}
             {panel === "help" && <Codex worldFlags={worldFlags} />}
@@ -1437,7 +1597,44 @@ function WorldMap({ level, location, travel }: { level: number; location: string
   </div>;
 }
 
-function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice, engine }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; engine: "ai" | "local" | null }) {
+function Journal({ quests, companions, dismiss }: { quests: QuestState[]; companions: CompanionState[]; dismiss: (id: CompanionState["id"]) => void }) {
+  const orderedQuests = [...quests].sort((left, right) => {
+    const weight = { active: 0, completed: 1, failed: 2 };
+    return weight[left.status] - weight[right.status] || (right.updatedAt || 0) - (left.updatedAt || 0);
+  });
+  const activeCount = quests.filter((quest) => quest.status === "active").length;
+  return <div className="journal-view">
+    <div className="modal-head"><small>COURIER FIELD LEDGER</small><h2>QUESTS & COMPANIONS</h2><p>{activeCount} active lead{activeCount === 1 ? "" : "s"} · Dialogue can alter every record below.</p></div>
+    <div className="journal-summary"><div><span>ACTIVE</span><b>{activeCount}</b></div><div><span>RESOLVED</span><b>{quests.filter((quest) => quest.status === "completed").length}</b></div><div><span>FAILED</span><b>{quests.filter((quest) => quest.status === "failed").length}</b></div><div><span>PARTY</span><b>{companions.filter((companion) => companion.status === "active").length}/2</b></div></div>
+    <div className="journal-columns">
+      <section className="quest-ledger"><header><span>QUEST LEDGER</span><small>AI-DIRECTED · PERSISTENT</small></header><div className="journal-scroll">
+        {orderedQuests.length ? orderedQuests.map((quest) => {
+          const completeObjectives = quest.objectives.filter((objective) => objective.complete).length;
+          return <article className={`quest-card ${quest.status}`} key={quest.id}>
+            <div className="quest-title"><span>{quest.status}</span><strong>{quest.title}</strong><em>{completeObjectives}/{quest.objectives.length}</em></div>
+            <p>{quest.description}</p><small>GIVER · {quest.giver} · REWARD {quest.rewardXp} XP</small>
+            <ul>{quest.objectives.map((objective) => <li className={objective.complete ? "done" : ""} key={objective.id}><i>{objective.complete ? "✓" : "◇"}</i>{objective.text}</li>)}</ul>
+            {quest.history.at(-1) && <blockquote>{quest.history.at(-1)}</blockquote>}
+          </article>;
+        }) : <p className="journal-empty">No leads yet. Talk to people and make promises.</p>}
+      </div></section>
+      <section className="companion-ledger"><header><span>COMPANION ROSTER</span><small>2 FIELD SLOTS</small></header><div className="journal-scroll">
+        {companions.map((companion) => <article className={`companion-card ${companion.status}`} key={companion.id}>
+          <div className="companion-card-head"><div className="companion-mini-portrait"><Sprite row={2} col={0} label={`${companion.name} portrait`} /></div><div><span>{companion.status}</span><strong>{companion.name}</strong><small>{companion.role}</small></div></div>
+          <div className="companion-meter"><span>HP {companion.hp}/{companion.maxHp}</span><i><b style={{ width: `${(companion.hp / companion.maxHp) * 100}%` }} /></i></div>
+          <div className="companion-meter loyalty"><span>LOYALTY {companion.loyalty}</span><i><b style={{ width: `${companion.loyalty}%` }} /></i></div>
+          <div className="companion-meter morale"><span>MORALE {companion.morale}</span><i><b style={{ width: `${companion.morale}%` }} /></i></div>
+          <p>“{companion.opinion}”</p>
+          <ul>{companion.abilities.map((ability) => <li key={ability}>{ability}</li>)}</ul>
+          {companion.status === "active" && <button onClick={() => dismiss(companion.id)}>ASK TO WAIT HERE</button>}
+          {companion.status === "available" || companion.status === "dismissed" ? <em>Recruit through conversation. Rowan decides for herself.</em> : null}
+        </article>)}
+      </div></section>
+    </div>
+  </div>;
+}
+
+function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice, engine, activeQuestCount, companionStatus }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; engine: "ai" | "local" | null; activeQuestCount: number; companionStatus: CompanionState["status"] }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const box = transcriptRef.current;
@@ -1455,7 +1652,7 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
       <div className="likes"><span><b>LIKES</b> candor, maps, coffee</span><span><b>DISLIKES</b> Citadel clerks, threats</span></div>
     </aside>
     <section className="conversation">
-      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION · {engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}</small><strong>Say anything. Rowan remembers—and acts.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
+      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION · {engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}</small><strong>Say anything. Rowan remembers—and acts.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"} · {activeQuestCount} ACTIVE QUEST{activeQuestCount === 1 ? "" : "S"} · PARTY {companionStatus.toUpperCase()}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
       <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : line.speaker === "WORLD" ? "world-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CEDAR · ADULT BARITONE" : line.speaker === "WORLD" ? "STATE" : "MARIN · ADULT CONTRALTO"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Reading your words against memory, motive, and the state of the world…</p></div>}</div>
       <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "CALCULATING…" : "SAY IT"}</button><small>Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions.</small></div>
     </section>
