@@ -155,6 +155,8 @@ export default function Home() {
   const [interior, setInterior] = useState<string | null>(null);
   const [dialogueInput, setDialogueInput] = useState("");
   const [dialogueBusy, setDialogueBusy] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [speakingCharacter, setSpeakingCharacter] = useState<"YOU" | "ROWAN" | null>(null);
   const [npc, setNpc] = useState<NpcState>({
     trust: 18,
     respect: 24,
@@ -174,6 +176,8 @@ export default function Home() {
   const logId = useRef(3);
   const sceneRef = useRef<HTMLElement | null>(null);
   const walkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceQueue = useRef<Promise<void>>(Promise.resolve());
+  const activeAudio = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     try {
@@ -412,22 +416,80 @@ export default function Home() {
     return roll < 45 ? "That’s a strange thing to say out here. Still… I believe you mean it." : "Words are cheap on this road. Give me a reason to remember yours.";
   };
 
+  const speakWithDeviceVoice = (text: string, character: "player" | "rowan") => new Promise<void>((resolve) => {
+    if (!("speechSynthesis" in window)) { resolve(); return; }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices().filter((voice) => /^en[-_]/i.test(voice.lang));
+    const preferred = character === "rowan"
+      ? voices.find((voice) => /zira|samantha|aria|female|natural/i.test(voice.name)) || voices[1] || voices[0]
+      : voices.find((voice) => /david|guy|male|mark/i.test(voice.name)) || voices[0];
+    if (preferred) utterance.voice = preferred;
+    utterance.rate = character === "rowan" ? .88 : .98;
+    utterance.pitch = character === "rowan" ? .82 : 1.02;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+
+  const queueVoice = (text: string, character: "player" | "rowan", mood = "neutral") => {
+    if (!voiceEnabled || !text.trim()) return;
+    voiceQueue.current = voiceQueue.current.then(async () => {
+      setSpeakingCharacter(character === "rowan" ? "ROWAN" : "YOU");
+      try {
+        const response = await fetch("/api/speech", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, character, mood }),
+        });
+        if (!response.ok) throw new Error("Hosted voice unavailable");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        await new Promise<void>((resolve) => {
+          const audio = new Audio(url);
+          activeAudio.current = audio;
+          audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.play().catch(() => { URL.revokeObjectURL(url); resolve(); });
+        });
+      } catch {
+        await speakWithDeviceVoice(text, character);
+      } finally {
+        activeAudio.current = null;
+        setSpeakingCharacter(null);
+      }
+    });
+  };
+
+  const toggleVoice = () => {
+    setVoiceEnabled((enabled) => {
+      if (enabled) {
+        activeAudio.current?.pause();
+        window.speechSynthesis?.cancel();
+        setSpeakingCharacter(null);
+      }
+      return !enabled;
+    });
+  };
+
   const speak = async () => {
     const message = dialogueInput.trim();
     if (!message || dialogueBusy) return;
     setDialogueInput("");
     setConversation((v) => [...v, { speaker: "YOU", text: message }]);
     setDialogueBusy(true);
+    queueVoice(message, "player", "intentional");
     const slot = await spinFate("Dialogue check");
     try {
       const response = await fetch("/api/dialogue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, npc, skills, luck, slot: slot.score, worldFlags, location }),
+        body: JSON.stringify({ message, npc, skills, luck, slot: slot.score, worldFlags, location, history: conversation.slice(-10) }),
       });
       if (!response.ok) throw new Error("Dialogue service unavailable");
       const turn = await response.json();
       setConversation((v) => [...v, { speaker: "ROWAN", text: turn.reply }]);
+      queueVoice(turn.reply, "rowan", turn.mood || npc.mood);
       setNpc((old) => ({
         trust: clamp(old.trust + Number(turn.trustDelta || 0)),
         respect: clamp(old.respect + Number(turn.respectDelta || 0)),
@@ -444,6 +506,7 @@ export default function Home() {
     } catch {
       const reply = fallbackDialogue(message, slot.score);
       setConversation((v) => [...v, { speaker: "ROWAN", text: reply }]);
+      queueVoice(reply, "rowan", slot.score < 55 ? "curious" : "guarded");
       setNpc((old) => ({
         ...old,
         trust: clamp(old.trust + (slot.score < 55 ? 2 : -1)),
@@ -614,6 +677,9 @@ export default function Home() {
                 speak={speak}
                 busy={dialogueBusy}
                 reels={reels}
+                voiceEnabled={voiceEnabled}
+                speakingCharacter={speakingCharacter}
+                toggleVoice={toggleVoice}
               />
             )}
             {panel === "help" && <Codex worldFlags={worldFlags} />}
@@ -681,7 +747,12 @@ function WorldMap({ level, location, travel }: { level: number; location: string
   </div>;
 }
 
-function Dialogue({ npc, conversation, input, setInput, speak, busy, reels }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[] }) {
+function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void }) {
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const box = transcriptRef.current;
+    if (box) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+  }, [conversation, busy]);
   return <div className="dialogue-view">
     <aside className="npc-dossier">
       <div className="npc-portrait"><Sprite row={2} col={0} label="Rowan portrait" /></div>
@@ -694,9 +765,9 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels }: { 
       <div className="likes"><span><b>LIKES</b> candor, maps, coffee</span><span><b>DISLIKES</b> Citadel clerks, threats</span></div>
     </aside>
     <section className="conversation">
-      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION</small><strong>Say anything. Rowan remembers.</strong></div><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
-      <div className="transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : "npc-line"}><span>{line.speaker}</span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Weighing your words against the road…</p></div>}</div>
-      <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "THINKING…" : "SAY IT"}</button><small>Each turn updates memory, mood, opinions, relationships, and potentially the world.</small></div>
+      <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION</small><strong>Say anything. Rowan remembers.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
+      <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CORAL" : "CEDAR"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Weighing your words against what you have already said…</p></div>}</div>
+      <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "THINKING…" : "SAY IT"}</button><small>Every line is spoken. Voices are AI-generated. Rowan tracks context, subtext, memory, mood, and consequences.</small></div>
     </section>
   </div>;
 }
