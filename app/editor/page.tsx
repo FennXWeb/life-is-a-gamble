@@ -1,11 +1,17 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { chatGPTSignInPath } from "../chatgpt-auth";
 import { getEditorUser, isEditorAdmin } from "./admin";
 import { EditorShell } from "./editor-shell";
 import styles from "./editor.module.css";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "LIAG Editor · Life is a Gamble",
+  description: "Admin world, character, encounter, loot, and quest authoring for Life is a Gamble.",
+  robots: { index: false, follow: false },
+};
 
 export default function EditorPage() {
   return <EditorGate />;
