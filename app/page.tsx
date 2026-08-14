@@ -45,13 +45,21 @@ const playableCity = "Syracuse";
 const initialSkills = { Guns: 3, Barter: 2, Speech: 3, Survival: 4, Medicine: 1, Mechanics: 2 };
 const reelSymbols = ["♠", "7", "☢", "♦", "★", "BAR"];
 
-const inventoryItems = [
-  { id: 1, name: "Pipe Pistol", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "5–9 DMG · .22 scrapshot" },
-  { id: 2, name: "Road Coat", icon: "♜", x: 3, y: 0, w: 2, h: 3, note: "+1 Armor · many pockets" },
-  { id: 3, name: "Dried Apples", icon: "●", x: 0, y: 2, w: 1, h: 1, note: "+8 HP · tastes like paper" },
-  { id: 4, name: "Bent Lockpick", icon: "⌁", x: 1, y: 2, w: 1, h: 2, note: "+5% Lockpick · fragile" },
-  { id: 5, name: "Old Chips", icon: "◉", x: 6, y: 0, w: 2, h: 2, note: "Currency · 37 chips" },
-  { id: 6, name: "Squirrel Tail", icon: "〰", x: 6, y: 3, w: 1, h: 2, note: "Quest item · still warm" },
+type EquipSlot = "head" | "torso" | "legs" | "hands" | "feet" | "holster-left" | "holster-right";
+type InventoryItem = { id: number; name: string; icon: string; x: number; y: number; w: number; h: number; note: string; weight: number; fits?: Exclude<EquipSlot, "holster-left" | "holster-right"> | "holster"; equipped: EquipSlot | null };
+
+const inventoryItems: InventoryItem[] = [
+  { id: 1, name: "Pipe Pistol", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "5–9 DMG · .22 scrapshot", weight: 2.1, fits: "holster", equipped: "holster-right" },
+  { id: 2, name: "Road Coat", icon: "♜", x: 3, y: 0, w: 2, h: 3, note: "+1 Armor · many pockets", weight: 4.2, fits: "torso", equipped: "torso" },
+  { id: 3, name: "Dried Apples", icon: "●", x: 2, y: 0, w: 1, h: 1, note: "+8 HP · tastes like paper", weight: .4, equipped: null },
+  { id: 4, name: "Bent Lockpick", icon: "⌁", x: 0, y: 0, w: 1, h: 2, note: "+5% Lockpick · fragile", weight: .1, equipped: null },
+  { id: 5, name: "Old Chips", icon: "◉", x: 3, y: 0, w: 2, h: 2, note: "Currency · 37 chips", weight: 1.2, equipped: null },
+  { id: 6, name: "Squirrel Tail", icon: "〰", x: 5, y: 0, w: 1, h: 2, note: "Quest item · still warm", weight: .3, equipped: null },
+  { id: 7, name: "Welding Hood", icon: "◒", x: 6, y: 0, w: 2, h: 2, note: "+1 Perception defense · smoked lens", weight: 1.8, fits: "head", equipped: null },
+  { id: 8, name: "Work Gloves", icon: "✥", x: 8, y: 0, w: 2, h: 1, note: "+1 Mechanics · cracked leather", weight: .6, fits: "hands", equipped: null },
+  { id: 9, name: "Road Boots", icon: "⌊", x: 8, y: 2, w: 2, h: 2, note: "+1 Survival · resoled twice", weight: 2.4, fits: "feet", equipped: null },
+  { id: 10, name: "Canvas Trousers", icon: "⋔", x: 6, y: 3, w: 2, h: 2, note: "+2 carry weight · reinforced knees", weight: 1.5, fits: "legs", equipped: null },
+  { id: 11, name: "Scrap Knife", icon: "†", x: 0, y: 3, w: 1, h: 2, note: "3–6 DMG · quiet and close", weight: .8, fits: "holster", equipped: null },
 ];
 
 function Sprite({ row, col, label, className = "" }: { row: number; col: number; label: string; className?: string }) {
@@ -690,7 +698,7 @@ export default function Home() {
   );
 }
 
-function Inventory({ chips }: { chips: number }) {
+function LegacyInventory({ chips }: { chips: number }) {
   const [selected, setSelected] = useState(inventoryItems[0]);
   return <div className="inventory-view">
     <div className="modal-head"><small>FIELD STORAGE</small><h2>PACK GRID</h2><p>Drag space is survival. Every object occupies real room.</p></div>
@@ -715,6 +723,90 @@ function Inventory({ chips }: { chips: number }) {
       </div>
     </div>
     <div className="inventory-foot"><span>OLD-WORLD CHIPS</span><b>◉ {chips}</b><em>Local save active</em></div>
+  </div>;
+}
+
+function Inventory({ chips }: { chips: number }) {
+  const [items, setItems] = useState<InventoryItem[]>(inventoryItems);
+  const [selectedId, setSelectedId] = useState(inventoryItems[0].id);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [message, setMessage] = useState("Drag items between the pack and equipment slots.");
+  const selected = items.find((item) => item.id === selectedId) || items[0];
+  const packedItems = items.filter((item) => !item.equipped);
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+  const slots: Array<{ id: EquipSlot; label: string; mark: string }> = [
+    { id: "head", label: "HEAD", mark: "◉" }, { id: "torso", label: "TORSO", mark: "▣" },
+    { id: "hands", label: "HANDS", mark: "✥" }, { id: "legs", label: "LEGS", mark: "⋔" },
+    { id: "feet", label: "FEET", mark: "⌊" }, { id: "holster-left", label: "L HOLSTER", mark: "↙" },
+    { id: "holster-right", label: "R HOLSTER", mark: "↘" },
+  ];
+
+  const beginDrag = (event: React.DragEvent, item: InventoryItem) => {
+    setSelectedId(item.id); setDraggingId(item.id);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(item.id));
+  };
+
+  const canPlace = (item: InventoryItem, x: number, y: number) => {
+    if (x < 0 || y < 0 || x + item.w > 10 || y + item.h > 6) return false;
+    return packedItems.every((other) => other.id === item.id || x + item.w <= other.x || other.x + other.w <= x || y + item.h <= other.y || other.y + other.h <= y);
+  };
+
+  const dropInPack = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const item = items.find((entry) => entry.id === draggingId);
+    if (!item) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(9, Math.floor((event.clientX - bounds.left) / (bounds.width / 10))));
+    const y = Math.max(0, Math.min(5, Math.floor((event.clientY - bounds.top) / (bounds.height / 6))));
+    if (!canPlace(item, x, y)) setMessage("That space is blocked or too small for this item.");
+    else {
+      setItems((old) => old.map((entry) => entry.id === item.id ? { ...entry, x, y, equipped: null } : entry));
+      setMessage(`${item.name} stowed at pack cell ${x + 1}, ${y + 1}.`);
+    }
+    setDraggingId(null); setDragOver(null);
+  };
+
+  const dropOnSlot = (event: React.DragEvent, slot: EquipSlot) => {
+    event.preventDefault();
+    const item = items.find((entry) => entry.id === draggingId);
+    if (!item) return;
+    const compatible = item.fits === slot || (item.fits === "holster" && slot.startsWith("holster"));
+    const occupied = items.find((entry) => entry.equipped === slot && entry.id !== item.id);
+    if (!compatible) setMessage(`${item.name} does not fit the ${slot.replace("-", " ")} slot.`);
+    else if (occupied) setMessage(`${slot.replace("-", " ")} is already occupied by ${occupied.name}.`);
+    else {
+      setItems((old) => old.map((entry) => entry.id === item.id ? { ...entry, equipped: slot } : entry));
+      setMessage(`${item.name} equipped to ${slot.replace("-", " ")}.`);
+    }
+    setDraggingId(null); setDragOver(null);
+  };
+
+  return <div className="inventory-view interactive-inventory">
+    <div className="modal-head"><small>FIELD STORAGE · CLICK & DRAG</small><h2>PACK & LOADOUT</h2><p>Every item occupies physical space. Drag gear onto the Courier or rearrange the pack.</p></div>
+    <div className="weight"><span>LOAD</span><strong>{totalWeight.toFixed(1)} / 28 KG</strong><i><b style={{ width: `${Math.min(100, totalWeight / 28 * 100)}%` }} /></i></div>
+    <div className="inventory-body">
+      <div className="paperdoll full-loadout">
+        <span>EQUIPMENT LOADOUT</span>
+        <div className="body-silhouette" aria-label="Courier equipment silhouette"><i className="sil-head"/><i className="sil-torso"/><i className="sil-arm left"/><i className="sil-arm right"/><i className="sil-leg left"/><i className="sil-leg right"/></div>
+        {slots.map((slot) => {
+          const equipped = items.find((item) => item.equipped === slot.id);
+          return <div key={slot.id} className={`equip-slot slot-${slot.id} ${dragOver === slot.id ? "drag-over" : ""} ${equipped ? "occupied" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver(slot.id); }} onDragLeave={() => setDragOver(null)} onDrop={(event) => dropOnSlot(event, slot.id)}>
+            <small>{slot.mark} {slot.label}</small>
+            {equipped ? <button draggable onDragStart={(event) => beginDrag(event, equipped)} onDragEnd={() => { setDraggingId(null); setDragOver(null); }} onClick={() => setSelectedId(equipped.id)}><b>{equipped.icon}</b><span>{equipped.name}</span></button> : <em>EMPTY</em>}
+          </div>;
+        })}
+      </div>
+      <div className="grid-wrap">
+        <div className={`stash-grid ${dragOver === "pack" ? "drag-over" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver("pack"); }} onDragLeave={() => setDragOver(null)} onDrop={dropInPack}>
+          {Array.from({ length: 60 }, (_, i) => <i key={i} />)}
+          {packedItems.map((item) => <button key={item.id} draggable className={`${selected.id === item.id ? "selected" : ""} ${draggingId === item.id ? "dragging" : ""}`} onDragStart={(event) => beginDrag(event, item)} onDragEnd={() => { setDraggingId(null); setDragOver(null); }} onClick={() => setSelectedId(item.id)} style={{ gridColumn: `${item.x + 1} / span ${item.w}`, gridRow: `${item.y + 1} / span ${item.h}` }} title={item.name}><b>{item.icon}</b><span>{item.name}</span></button>)}
+        </div>
+        <div className="item-readout"><div><small>INSPECTED ITEM · {selected.equipped ? `EQUIPPED: ${selected.equipped.toUpperCase()}` : `${selected.w}×${selected.h} PACK CELLS`}</small><strong>{selected.name}</strong><p>{selected.note} · {selected.weight.toFixed(1)} KG</p><em>{message}</em></div><b>{selected.icon}</b></div>
+      </div>
+    </div>
+    <div className="inventory-foot"><span>OLD-WORLD CHIPS</span><b>◉ {chips}</b><em>Drag equipped items back into any valid pack cell to unequip</em></div>
   </div>;
 }
 
