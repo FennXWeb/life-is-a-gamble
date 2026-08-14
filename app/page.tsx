@@ -469,6 +469,11 @@ export default function Home() {
   }, [walking, movementMode]);
 
   useEffect(() => {
+    const nextMode = mainMenu ? "menu" : combat === "player" || combat === "enemy" ? "combat" : panel === "dialogue" ? "dialogue" : interior ? "interior" : "ambient";
+    audio.setMusic(nextMode);
+  }, [mainMenu, combat, panel, interior, audio.setMusic]);
+
+  useEffect(() => {
     if (mainMenu || interior || enemyHp <= 0 || combat !== "idle") {
       return;
     }
@@ -658,6 +663,7 @@ export default function Home() {
     if (isSpinning) return { score: 0, jackpot: false, symbols: reels };
     setIsSpinning(true);
     setSlotLabel(reason.toUpperCase());
+    audio.play("slotSpin");
     for (let step = 0; step < 7; step++) {
       await new Promise((resolve) => setTimeout(resolve, 75 + step * 14));
       setReels([
@@ -677,6 +683,7 @@ export default function Home() {
     setReels(finalSymbols);
     setSlotLabel(jackpot ? "JACKPOT" : lucky ? "LUCK TURNS" : `ROLL ${roll}`);
     setIsSpinning(false);
+    audio.play(jackpot || lucky ? "slotWin" : "slotLose");
     if (jackpot) {
       setChips((v) => v + 25);
       addLog("JACKPOT · Fate pays 25 old-world chips.", "good");
@@ -1068,12 +1075,12 @@ export default function Home() {
           <small>100 YEARS AFTER THE FEDERAL SILENCE</small>
           <h2>LIFE <i>IS A</i> GAMBLE</h2>
           <p>Syracuse is awake. The radio is not.</p>
-          <div className={`radio-readout ${audio.ready ? "online" : ""}`}><b>{audio.ready ? "RADIO ONLINE · 89.7 WSTL" : "RADIO DORMANT"}</b><span>{audio.ready ? "Main theme transmitting" : "Activate audio to hear the title transmission"}</span></div>
+          <div className={`radio-readout ${audio.ready ? "online" : ""}`}><b>{audio.ready ? "RADIO ONLINE · 89.7 WSTL" : "RADIO DORMANT"}</b><span>{audio.ready ? audio.musicStatus : "Activate audio to hear the title transmission"}</span></div>
           <div className="main-menu-actions">
             <button onClick={() => { void audio.activate("menu"); }}>{audio.ready ? "RESTART TITLE SIGNAL" : "WAKE THE RADIO"}</button>
-            <button className="enter-game" onClick={async () => { await audio.activate("menu"); audio.play("door"); setMainMenu(false); audio.setMusic("ambient"); }}>ENTER SYRACUSE</button>
+            <button className="enter-game" onClick={async () => { await audio.activate("menu"); audio.play("door"); setMainMenu(false); }}>ENTER SYRACUSE</button>
           </div>
-          <em>Original procedural score and sound effects · Headphones recommended</em>
+          <em>Folder-driven soundtrack · Randomized by scene · Headphones recommended</em>
         </div>
       </section>}
       <header className="topbar">
