@@ -362,6 +362,36 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .interactive-inventory .item-readout{min-height:82px}.interactive-inventory .item-readout em{display:block;margin-top:5px;color:#aa8b55;font:700 7px/1.25 monospace;font-style:normal}.interactive-inventory .inventory-foot{margin-left:453px;margin-bottom:17px}
 @media(max-width:980px){.interactive-inventory .inventory-body{grid-template-columns:330px 1fr;padding-left:24px;padding-right:24px}.equip-slot{width:94px}.interactive-inventory .inventory-foot{margin-left:379px}.body-silhouette{transform:translateX(-50%) scale(.88)}.slot-torso,.slot-legs,.slot-holster-right{right:8px}.slot-head,.slot-hands,.slot-feet,.slot-holster-left{left:8px}}
 
+/* Collision-authored street scale and reusable actor motion. */
+.sedan-prop{right:25%;bottom:18%;width:142px;height:88px}
+.lamp-prop{left:38%;top:46%;width:58px;height:108px}
+.barricade-prop{left:58%;bottom:14%;width:105px;height:74px}
+.tree-prop{left:30%;top:44%;width:92px;height:115px}
+.decor-sprite{transform:translate(-50%,-78%);transform-origin:center bottom}
+.npc-actor{transition-property:left,top;transition-timing-function:linear;will-change:left,top}
+.npc-actor .sprite{--actor-facing:1;transform-origin:50% 88%;animation:npcIdleHuman 2.8s ease-in-out infinite}
+.npc-actor[data-facing="left"] .sprite{--actor-facing:-1}
+.npc-actor .entity-ring{animation:npcIdleRing 2.8s ease-in-out infinite}
+.npc-actor.downtown-squirrel .sprite{animation-name:npcIdleCreature;animation-duration:1.15s}
+.npc-actor.patrol .sprite{animation:npcPatrolStride .24s ease-in-out infinite alternate}
+.npc-actor.patrol .entity-ring{animation:npcPatrolRing .24s ease-in-out infinite alternate}
+.npc-actor.combat .sprite{animation:npcCombatReady .7s ease-in-out infinite alternate}
+@keyframes npcIdleHuman{
+  0%,100%{transform:scaleX(var(--actor-facing)) translateY(0) rotate(0)}
+  42%{transform:scaleX(var(--actor-facing)) translateY(-1.5px) rotate(.35deg)}
+  68%{transform:scaleX(var(--actor-facing)) translateY(0) rotate(-.25deg)}
+}
+@keyframes npcIdleCreature{
+  0%,100%{transform:scaleX(var(--actor-facing)) translateY(0) rotate(0)}
+  18%{transform:scaleX(var(--actor-facing)) translateY(-2px) rotate(-1deg)}
+  24%{transform:scaleX(var(--actor-facing)) translateY(0) rotate(1deg)}
+  64%{transform:scaleX(var(--actor-facing)) translateY(-1px) rotate(0)}
+}
+@keyframes npcPatrolStride{to{transform:scaleX(var(--actor-facing)) translateY(-5px) rotate(-1deg)}}
+@keyframes npcCombatReady{to{transform:scaleX(var(--actor-facing)) translateY(-2px) scale(1.02)}}
+@keyframes npcIdleRing{50%{transform:scale(.94);opacity:.74}}
+@keyframes npcPatrolRing{to{transform:scaleX(.82);opacity:.48}}
+
 /* Salvaged command HUD v5: generated material textures and readable field typography. */
 :root{--hud-atlas:url('/hud-material-atlas.png');--hud-cream:#f0e2bf;--hud-dim:#b7ad91;--hud-brass:#d6aa58;--hud-orange:#ed7b35;--hud-green:#b7ca8b}
 .game-shell{grid-template-rows:94px minmax(0,1fr) 174px;background:#080a08}

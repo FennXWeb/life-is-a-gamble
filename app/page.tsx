@@ -27,6 +27,115 @@ type NpcState = {
   memories: string[];
 };
 
+type WorldPoint = { x: number; y: number };
+type CollisionZone =
+  | { kind: "rect"; x1: number; x2: number; y1: number; y2: number; label: string }
+  | { kind: "ellipse"; x: number; y: number; rx: number; ry: number; label: string };
+
+const WALKABLE_BOUNDS = { x1: 4, x2: 96, y1: 46.5, y2: 90 };
+const PLAYER_CLEARANCE = { x: 1.15, y: .8 };
+
+const fixedCollisionZones: CollisionZone[] = [
+  { kind: "rect", x1: 0, x2: 100, y1: 0, y2: 45.6, label: "North Fayette building frontage" },
+  { kind: "ellipse", x: 70, y: 79, rx: 5.7, ry: 2.7, label: "abandoned sedan" },
+  { kind: "ellipse", x: 40, y: 57, rx: 1.5, ry: 1.25, label: "street lamp" },
+  { kind: "ellipse", x: 63, y: 84, rx: 4.6, ry: 2.2, label: "scrap barricade" },
+  { kind: "ellipse", x: 34, y: 61, rx: 3.2, ry: 1.8, label: "dead tree planter" },
+];
+
+function pointBlocked(point: WorldPoint, dynamicZones: CollisionZone[] = []) {
+  if (point.x < WALKABLE_BOUNDS.x1 || point.x > WALKABLE_BOUNDS.x2 || point.y < WALKABLE_BOUNDS.y1 || point.y > WALKABLE_BOUNDS.y2) return true;
+  return [...fixedCollisionZones, ...dynamicZones].some((zone) => {
+    if (zone.kind === "rect") return point.x >= zone.x1 - PLAYER_CLEARANCE.x && point.x <= zone.x2 + PLAYER_CLEARANCE.x && point.y >= zone.y1 - PLAYER_CLEARANCE.y && point.y <= zone.y2 + PLAYER_CLEARANCE.y;
+    const dx = (point.x - zone.x) / (zone.rx + PLAYER_CLEARANCE.x);
+    const dy = (point.y - zone.y) / (zone.ry + PLAYER_CLEARANCE.y);
+    return dx * dx + dy * dy <= 1;
+  });
+}
+
+function segmentIsClear(from: WorldPoint, to: WorldPoint, dynamicZones: CollisionZone[] = []) {
+  const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / .55));
+  for (let step = 1; step <= steps; step++) {
+    const amount = step / steps;
+    if (pointBlocked({ x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount }, dynamicZones)) return false;
+  }
+  return true;
+}
+
+function findWalkPath(start: WorldPoint, requestedTarget: WorldPoint, dynamicZones: CollisionZone[] = []) {
+  const step = 1.8;
+  const columns = Math.floor((WALKABLE_BOUNDS.x2 - WALKABLE_BOUNDS.x1) / step) + 1;
+  const rows = Math.floor((WALKABLE_BOUNDS.y2 - WALKABLE_BOUNDS.y1) / step) + 1;
+  const toPoint = (column: number, row: number): WorldPoint => ({ x: WALKABLE_BOUNDS.x1 + column * step, y: WALKABLE_BOUNDS.y1 + row * step });
+  const nearestCell = (point: WorldPoint) => ({
+    column: Math.max(0, Math.min(columns - 1, Math.round((point.x - WALKABLE_BOUNDS.x1) / step))),
+    row: Math.max(0, Math.min(rows - 1, Math.round((point.y - WALKABLE_BOUNDS.y1) / step))),
+  });
+  const requestedCell = nearestCell(requestedTarget);
+  let targetCell = requestedCell;
+  if (pointBlocked(toPoint(targetCell.column, targetCell.row), dynamicZones)) {
+    let nearest: { column: number; row: number; distance: number } | null = null;
+    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+      const point = toPoint(column, row);
+      if (pointBlocked(point, dynamicZones)) continue;
+      const distance = Math.hypot(column - requestedCell.column, row - requestedCell.row);
+      if (!nearest || distance < nearest.distance) nearest = { column, row, distance };
+    }
+    if (!nearest) return [];
+    targetCell = nearest;
+  }
+  const startCell = nearestCell(start);
+  const key = (column: number, row: number) => `${column},${row}`;
+  const targetKey = key(targetCell.column, targetCell.row);
+  const open = [{ ...startCell, score: 0 }];
+  const cameFrom = new Map<string, string>();
+  const cost = new Map<string, number>([[key(startCell.column, startCell.row), 0]]);
+  const directions = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => ({ dx, dy }))).filter(({ dx, dy }) => dx || dy);
+  let found = false;
+  while (open.length) {
+    open.sort((a, b) => a.score - b.score);
+    const current = open.shift()!;
+    const currentKey = key(current.column, current.row);
+    if (currentKey === targetKey) { found = true; break; }
+    for (const { dx, dy } of directions) {
+      const column = current.column + dx;
+      const row = current.row + dy;
+      if (column < 0 || column >= columns || row < 0 || row >= rows) continue;
+      const point = toPoint(column, row);
+      if (pointBlocked(point, dynamicZones)) continue;
+      if (dx && dy && (pointBlocked(toPoint(current.column + dx, current.row), dynamicZones) || pointBlocked(toPoint(current.column, current.row + dy), dynamicZones))) continue;
+      const nextKey = key(column, row);
+      const nextCost = (cost.get(currentKey) ?? 0) + (dx && dy ? 1.414 : 1);
+      if (nextCost >= (cost.get(nextKey) ?? Infinity)) continue;
+      cost.set(nextKey, nextCost);
+      cameFrom.set(nextKey, currentKey);
+      open.push({ column, row, score: nextCost + Math.hypot(targetCell.column - column, targetCell.row - row) });
+    }
+  }
+  if (!found) return [];
+  const cells: WorldPoint[] = [];
+  let cursor = targetKey;
+  while (cursor !== key(startCell.column, startCell.row)) {
+    const [column, row] = cursor.split(",").map(Number);
+    cells.unshift(toPoint(column, row));
+    cursor = cameFrom.get(cursor)!;
+  }
+  const candidates = [start, ...cells];
+  const route: WorldPoint[] = [];
+  let anchor = 0;
+  while (anchor < candidates.length - 1) {
+    let furthest = anchor + 1;
+    for (let next = anchor + 2; next < candidates.length; next++) {
+      if (!segmentIsClear(candidates[anchor], candidates[next], dynamicZones)) break;
+      furthest = next;
+    }
+    route.push(candidates[furthest]);
+    anchor = furthest;
+  }
+  if (!pointBlocked(requestedTarget, dynamicZones) && segmentIsClear(route.at(-1) ?? start, requestedTarget, dynamicZones)) route.push(requestedTarget);
+  return route;
+}
+
 const cities = [
   { name: "Niagara Falls", x: 5, y: 39, kind: "landmark", detail: "The water still falls. Everything around it does not." },
   { name: "Buffalo", x: 10, y: 57, kind: "city", detail: "Lakewall Exchange — caravans, grain futures, and old-world steel." },
@@ -96,6 +205,32 @@ function Sprite({ row, col, label, className = "" }: { row: number; col: number;
   );
 }
 
+function NpcActor({ className, status, statusTone, row, col, label, motion = "idle", facing = "right", position, transitionMs = 0, onClick }: {
+  className: string;
+  status: string;
+  statusTone: "npc" | "enemy";
+  row: number;
+  col: number;
+  label: string;
+  motion?: "idle" | "patrol" | "combat";
+  facing?: "left" | "right";
+  position: WorldPoint;
+  transitionMs?: number;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return <button
+    className={`npc-actor ${className} ${motion}`}
+    data-facing={facing}
+    style={{ left: `${position.x}%`, top: `${position.y}%`, transitionDuration: `${transitionMs}ms` }}
+    onClick={onClick}
+    aria-label={label}
+  >
+    <div className={`status-tag ${statusTone}`}>{status}</div>
+    <Sprite row={row} col={col} label={label} />
+    <div className="entity-ring" />
+  </button>;
+}
+
 function CourierMotionSprite({ mode, frame, label }: { mode: "idle" | "walk" | "run"; frame: number; label: string }) {
   const row = mode === "run" ? 1 : 0;
   const col = mode === "idle" ? 1 : frame;
@@ -113,8 +248,8 @@ function EnvSprite({ row, col, label, className = "", style }: { row: number; co
   return <div className={`env-sprite ${className}`} role="img" aria-label={label} style={{ ...style, backgroundPosition: `${col * 33.333}% ${row * 33.333}%` }} />;
 }
 
-function DecorSprite({ row, col, label, className = "" }: { row: number; col: number; label: string; className?: string }) {
-  return <div className={`decor-sprite ${className}`} role="img" aria-label={label} style={{ backgroundPosition: `${col * 33.333}% ${row * 50}%` }} />;
+function DecorSprite({ row, col, label, className = "", x, y, width, height }: { row: number; col: number; label: string; className?: string; x: number; y: number; width: number; height: number }) {
+  return <div className={`decor-sprite ${className}`} role="img" aria-label={label} style={{ left: `${x}%`, top: `${y}%`, width, height, backgroundPosition: `${col * 33.333}% ${row * 50}%` }} />;
 }
 
 function LandmarkSprite({ row, col, label, className = "" }: { row: number; col: number; label: string; className?: string }) {
@@ -183,25 +318,27 @@ const interactions: Record<string, InteractionTarget> = {
 };
 
 const cityDecor = [
-  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-a" },
-  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-b" },
-  { row: 0, col: 1, label: "Abandoned payphone", className: "decor-payphone" },
-  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-a" },
-  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-b" },
-  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-a" },
-  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-b" },
-  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-a" },
-  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-b" },
-  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-a" },
-  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-b" },
-  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-a" },
-  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-b" },
-  { row: 1, col: 3, label: "Overturned shopping cart", className: "decor-cart" },
-  { row: 2, col: 0, label: "Damaged traffic signal", className: "decor-signal" },
-  { row: 2, col: 1, label: "Stacked sandbags", className: "decor-sandbags" },
-  { row: 2, col: 2, label: "Leaning utility pole", className: "decor-pole" },
-  { row: 2, col: 3, label: "Broken municipal sign", className: "decor-sign" },
+  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-a", x: 42, y: 54, width: 38, height: 42, rx: 1.05, ry: .8 },
+  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-b", x: 62, y: 82, width: 38, height: 42, rx: 1.05, ry: .8 },
+  { row: 0, col: 1, label: "Abandoned payphone", className: "decor-payphone", x: 3, y: 53, width: 62, height: 82, rx: 1.8, ry: 1.15 },
+  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-a", x: 65, y: 53, width: 48, height: 54, rx: 1.35, ry: 1 },
+  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-b", x: 94, y: 81, width: 48, height: 54, rx: 1.35, ry: 1 },
+  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-a", x: 13, y: 52, width: 58, height: 58, rx: 1.9, ry: 1.25 },
+  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-b", x: 87, y: 72, width: 58, height: 58, rx: 1.9, ry: 1.25 },
+  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-a", x: 34, y: 52, width: 44, height: 48, rx: 1.25, ry: .9 },
+  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-b", x: 77, y: 81, width: 44, height: 48, rx: 1.25, ry: .9 },
+  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-a", x: 7, y: 72, width: 60, height: 60, rx: 2, ry: 1.3 },
+  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-b", x: 48, y: 84, width: 60, height: 60, rx: 2, ry: 1.3 },
+  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-a", x: 22, y: 52, width: 86, height: 58, rx: 3.2, ry: 1 },
+  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-b", x: 84, y: 52, width: 86, height: 58, rx: 3.2, ry: 1 },
+  { row: 1, col: 3, label: "Overturned shopping cart", className: "decor-cart", x: 72, y: 72, width: 72, height: 58, rx: 2.5, ry: 1.2 },
+  { row: 2, col: 0, label: "Damaged traffic signal", className: "decor-signal", x: 46, y: 52, width: 66, height: 82, rx: 1.7, ry: 1.15 },
+  { row: 2, col: 1, label: "Stacked sandbags", className: "decor-sandbags", x: 57, y: 83, width: 82, height: 56, rx: 3, ry: 1.1 },
+  { row: 2, col: 2, label: "Leaning utility pole", className: "decor-pole", x: 68, y: 54, width: 64, height: 112, rx: 1.45, ry: 1.05 },
+  { row: 2, col: 3, label: "Broken municipal sign", className: "decor-sign", x: 18, y: 79, width: 54, height: 68, rx: 1.35, ry: .9 },
 ];
+
+fixedCollisionZones.push(...cityDecor.map((decor): CollisionZone => ({ kind: "ellipse", x: decor.x, y: decor.y, rx: decor.rx, ry: decor.ry, label: decor.label })));
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
@@ -234,6 +371,10 @@ export default function Home() {
   const [movementMode, setMovementMode] = useState<"walk" | "run">("walk");
   const [walkFacing, setWalkFacing] = useState<"left" | "right">("right");
   const [walkDuration, setWalkDuration] = useState(500);
+  const [enemyPosition, setEnemyPosition] = useState<WorldPoint>({ x: 66, y: 78 });
+  const [enemyMoving, setEnemyMoving] = useState(false);
+  const [enemyFacing, setEnemyFacing] = useState<"left" | "right">("right");
+  const [enemyMoveDuration, setEnemyMoveDuration] = useState(1500);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: InteractionTarget } | null>(null);
   const [unlockedDoors, setUnlockedDoors] = useState<string[]>([]);
   const [interior, setInterior] = useState<string | null>(null);
@@ -263,6 +404,9 @@ export default function Home() {
   const logId = useRef(3);
   const sceneRef = useRef<HTMLElement | null>(null);
   const walkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const movementToken = useRef(0);
+  const enemyPatrolIndex = useRef(0);
+  const enemyStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceQueue = useRef<Promise<void>>(Promise.resolve());
   const activeAudio = useRef<HTMLAudioElement | null>(null);
 
@@ -307,44 +451,98 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [walking, movementMode]);
 
+  useEffect(() => {
+    if (mainMenu || interior || enemyHp <= 0 || combat !== "idle") {
+      return;
+    }
+    const patrolWaypoints: WorldPoint[] = [
+      { x: 65, y: 66 }, { x: 73, y: 66 }, { x: 81, y: 66 },
+      { x: 90, y: 66 }, { x: 84, y: 69 }, { x: 74, y: 70 },
+    ];
+    const timer = setTimeout(() => {
+      const ordered = patrolWaypoints.map((_, offset) => patrolWaypoints[(enemyPatrolIndex.current + offset) % patrolWaypoints.length]);
+      const patrolAvoidance: CollisionZone[] = [
+        { kind: "ellipse", x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" },
+        { kind: "ellipse", x: playerPosition.x, y: playerPosition.y, rx: 1.5, ry: 1.1, label: "player" },
+      ];
+      const next = ordered.find((candidate) => segmentIsClear(enemyPosition, candidate, patrolAvoidance));
+      if (!next) return;
+      enemyPatrolIndex.current = (patrolWaypoints.indexOf(next) + 1) % patrolWaypoints.length;
+      const sceneBounds = sceneRef.current?.getBoundingClientRect();
+      const pixelDistance = sceneBounds ? Math.hypot((next.x - enemyPosition.x) * sceneBounds.width / 100, (next.y - enemyPosition.y) * sceneBounds.height / 100) : 120;
+      const duration = Math.max(900, Math.min(1900, pixelDistance * 6.5));
+      setEnemyFacing(next.x < enemyPosition.x ? "left" : "right");
+      setEnemyMoveDuration(duration);
+      setEnemyMoving(true);
+      setEnemyPosition(next);
+      if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
+      enemyStopTimer.current = setTimeout(() => setEnemyMoving(false), duration);
+    }, 1800 + (enemyPatrolIndex.current % 3) * 650);
+    return () => clearTimeout(timer);
+  }, [mainMenu, interior, enemyHp, combat, enemyPosition, playerPosition.x, playerPosition.y]);
+
+  useEffect(() => () => {
+    movementToken.current += 1;
+    if (walkTimer.current) clearTimeout(walkTimer.current);
+    if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
+  }, []);
+
   const xpGoal = level * 100;
   const combatFrame = combat === "player" ? 3 : combat === "enemy" ? 4 : null;
-  const squirrelFrame = enemyHp <= 0 ? 4 : combat === "enemy" ? 3 : isSpinning ? 1 : 0;
+  const squirrelFrame = enemyHp <= 0 ? 4 : combat === "enemy" ? 3 : isSpinning || enemyMoving ? 1 : 0;
 
   const addLog = (text: string, tone: LogEntry["tone"] = "plain") => {
     setLog((old) => [...old.slice(-5), { id: logId.current++, tone, text }]);
+  };
+
+  const beginRoute = (route: WorldPoint[]) => {
+    const token = ++movementToken.current;
+    if (walkTimer.current) clearTimeout(walkTimer.current);
+    if (!route.length) { setWalking(false); return; }
+    setDestination(route[route.length - 1]);
+    const moveStep = (from: WorldPoint, index: number) => {
+      if (token !== movementToken.current || index >= route.length) {
+        if (token === movementToken.current) setWalking(false);
+        return;
+      }
+      const next = route[index];
+      const bounds = sceneRef.current?.getBoundingClientRect();
+      const distance = bounds ? Math.hypot((next.x - from.x) * bounds.width / 100, (next.y - from.y) * bounds.height / 100) : 80;
+      const nextMovementMode = distance > 260 ? "run" : "walk";
+      const duration = nextMovementMode === "run"
+        ? Math.max(220, Math.min(1150, distance * 2.05))
+        : Math.max(240, Math.min(1700, distance * 3.5));
+      setWalkFacing(next.x < from.x ? "left" : "right");
+      setWalkDuration(duration);
+      setMovementMode(nextMovementMode);
+      setWalkFrame(0);
+      setWalking(true);
+      setPlayerPosition(next);
+      walkTimer.current = setTimeout(() => moveStep(next, index + 1), duration);
+    };
+    moveStep(playerPosition, 0);
   };
 
   const walkTo = (event: React.MouseEvent<HTMLElement>) => {
     if (interior || combat === "enemy" || isSpinning) return;
     const bounds = sceneRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const x = Math.max(8, Math.min(92, ((event.clientX - bounds.left) / bounds.width) * 100));
-    const y = Math.max(30, Math.min(86, ((event.clientY - bounds.top) / bounds.height) * 100));
-    const blocked = [
-      { x1: 0, x2: 40, y1: 12, y2: 45 }, { x1: 66, x2: 100, y1: 12, y2: 45 },
-      { x1: 0, x2: 40, y1: 84, y2: 100 }, { x1: 66, x2: 100, y1: 84, y2: 100 },
+    const x = Math.max(WALKABLE_BOUNDS.x1, Math.min(WALKABLE_BOUNDS.x2, ((event.clientX - bounds.left) / bounds.width) * 100));
+    const y = Math.max(WALKABLE_BOUNDS.y1, Math.min(WALKABLE_BOUNDS.y2, ((event.clientY - bounds.top) / bounds.height) * 100));
+    const actorZones: CollisionZone[] = [
+      { kind: "ellipse", x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" },
+      ...(enemyHp > 0 ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.35, ry: 1, label: "rabid squirrel" }] : []),
     ];
-    if (blocked.some((area) => x >= area.x1 && x <= area.x2 && y >= area.y1 && y <= area.y2)) {
-      addLog("That route is blocked by a building footprint.", "bad");
-      setContextMenu(null);
+    const requested = { x, y };
+    const requestedBlocked = pointBlocked(requested, actorZones);
+    const route = findWalkPath(playerPosition, requested, actorZones);
+    setContextMenu(null);
+    if (!route.length) {
+      addLog("No walkable route reaches that point.", "bad");
       return;
     }
-    const distance = Math.hypot((x - playerPosition.x) * bounds.width / 100, (y - playerPosition.y) * bounds.height / 100);
-    const nextMovementMode = distance > 260 ? "run" : "walk";
-    const duration = nextMovementMode === "run"
-      ? Math.max(220, Math.min(1150, distance * 2.05))
-      : Math.max(240, Math.min(1700, distance * 3.5));
-    setContextMenu(null);
-    setWalkFacing(x < playerPosition.x ? "left" : "right");
-    setDestination({ x, y });
-    setWalkDuration(duration);
-    setMovementMode(nextMovementMode);
-    setWalkFrame(0);
-    setWalking(true);
-    setPlayerPosition({ x, y });
-    if (walkTimer.current) clearTimeout(walkTimer.current);
-    walkTimer.current = setTimeout(() => setWalking(false), duration);
+    if (requestedBlocked) addLog("Path adjusted to stop clear of the obstacle.", "system");
+    beginRoute(route);
   };
 
   const openInteraction = (event: React.MouseEvent, target: InteractionTarget) => {
@@ -669,10 +867,13 @@ export default function Home() {
         };
         const destinationPoint = anchors[action.target];
         if (!destinationPoint) return null;
-        setWalkFacing(destinationPoint.x < playerPosition.x ? "left" : "right");
-        setDestination(destinationPoint); setPlayerPosition(destinationPoint); setWalkDuration(700); setMovementMode("walk"); setWalking(true);
-        if (walkTimer.current) clearTimeout(walkTimer.current);
-        walkTimer.current = setTimeout(() => setWalking(false), 700);
+        const actorZones: CollisionZone[] = [
+          { kind: "ellipse", x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" },
+          ...(enemyHp > 0 ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.35, ry: 1, label: "rabid squirrel" }] : []),
+        ];
+        const route = findWalkPath(playerPosition, destinationPoint, actorZones);
+        if (!route.length) return "MOVE BLOCKED · no safe route";
+        beginRoute(route);
         return `MOVED · ${action.target.replaceAll("_", " ")}`;
       }
       case "grant_skill_points": {
@@ -880,10 +1081,29 @@ export default function Home() {
               <div className="entity-ring" />
             </div>
 
-            <button className="downtown-rowan" onClick={(e) => { e.stopPropagation(); setPanel("dialogue"); }} aria-label="Talk to Rowan">
-              <div className="status-tag npc">ROWAN · TALK</div><Sprite row={2} col={npc.trust > 35 ? 3 : 0} label="Rowan near Clinton Square" /><div className="entity-ring" />
-            </button>
-            {enemyHp > 0 && <button className="downtown-squirrel" onClick={(e) => { e.stopPropagation(); startCombat(); }} aria-label="Engage rabid squirrel"><div className="status-tag enemy">RABID SQUIRREL · {enemyHp}/18</div><Sprite row={1} col={squirrelFrame} label="Rabid squirrel in Armory Square alley" /><div className="entity-ring" /></button>}
+            <NpcActor
+              className="downtown-rowan"
+              status="ROWAN · TALK"
+              statusTone="npc"
+              row={2}
+              col={npc.trust > 35 ? 3 : 0}
+              label="Talk to Rowan"
+              position={{ x: 38, y: 72 }}
+              onClick={(event) => { event.stopPropagation(); setPanel("dialogue"); }}
+            />
+            {enemyHp > 0 && <NpcActor
+              className="downtown-squirrel"
+              status={`RABID SQUIRREL · ${enemyHp}/18`}
+              statusTone="enemy"
+              row={1}
+              col={squirrelFrame}
+              label="Engage rabid squirrel"
+              motion={combat === "idle" ? (enemyMoving ? "patrol" : "idle") : "combat"}
+              facing={enemyFacing}
+              position={enemyPosition}
+              transitionMs={enemyMoveDuration}
+              onClick={(event) => { event.stopPropagation(); startCombat(); }}
+            />}
             <div className="control-hint"><b>LEFT CLICK</b> WALK <i>•</i> <b>RIGHT CLICK</b> INTERACT <i>•</i> Doors remember locks</div>
           </> : <div className="interior-scene">
             <div className="interior-wall left-wall" /><div className="interior-wall right-wall" />
