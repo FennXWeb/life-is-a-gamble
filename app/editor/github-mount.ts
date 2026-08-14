@@ -5,6 +5,10 @@ export type GitHubMountConfig = {
   token: string;
 };
 
+export const MAIN_GAME_REPOSITORY = "FennXWeb/life-is-a-gamble";
+
+export type GitHubMountTarget = Omit<GitHubMountConfig, "token">;
+
 type GitHubContent = {
   type: "file";
   sha: string;
@@ -14,16 +18,21 @@ type GitHubContent = {
   content: string;
 };
 
-export function getGitHubMountConfig(): GitHubMountConfig | null {
-  const repository = process.env.LIAG_GITHUB_REPOSITORY?.trim() || "";
-  const token = process.env.LIAG_GITHUB_TOKEN?.trim() || "";
-  if (!repository || !token || !/^[\w.-]+\/[\w.-]+$/.test(repository)) return null;
+export function getGitHubMountTarget(): GitHubMountTarget {
+  const configuredRepository = process.env.LIAG_GITHUB_REPOSITORY?.trim() || MAIN_GAME_REPOSITORY;
+  const repository = /^[\w.-]+\/[\w.-]+$/.test(configuredRepository) ? configuredRepository : MAIN_GAME_REPOSITORY;
   return {
     repository,
-    token,
     branch: process.env.LIAG_GITHUB_BRANCH?.trim() || "testing",
     dataPath: normalizePath(process.env.LIAG_GITHUB_DATA_PATH?.trim() || "game-data/editor-project.json"),
   };
+}
+
+export function getGitHubMountConfig(): GitHubMountConfig | null {
+  const target = getGitHubMountTarget();
+  const token = process.env.LIAG_GITHUB_TOKEN?.trim() || "";
+  if (!token) return null;
+  return { ...target, token };
 }
 
 export function normalizePath(path: string) {

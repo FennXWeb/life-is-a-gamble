@@ -1,6 +1,6 @@
 import { createDefaultProject } from "../../../editor/default-project";
 import { requireEditorAdmin } from "../../../editor/admin";
-import { getGitHubMountConfig, githubError, readRepositoryFile, writeRepositoryFile } from "../../../editor/github-mount";
+import { getGitHubMountConfig, getGitHubMountTarget, githubError, readRepositoryFile, writeRepositoryFile } from "../../../editor/github-mount";
 import type { GameProject } from "../../../editor/project-types";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +19,10 @@ export async function GET() {
   if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status });
   const config = getGitHubMountConfig();
   if (!config) {
+    const target = getGitHubMountTarget();
     return Response.json({
       project: createDefaultProject(),
-      mount: { mounted: false, repository: "Not configured", branch: process.env.LIAG_GITHUB_BRANCH || "testing", path: process.env.LIAG_GITHUB_DATA_PATH || "game-data/editor-project.json", sha: null, message: "Add the LIAG GitHub repository and token runtime values to enable publishing." },
+      mount: { mounted: false, repository: target.repository, branch: target.branch, path: target.dataPath, sha: null, message: `The main game repository is selected. Add its LIAG_GITHUB_TOKEN runtime secret to enable publishing to ${target.branch}.` },
     });
   }
 
