@@ -7,16 +7,19 @@ import type { DialogueAction, DialogueGameSnapshot, DialogueTurn } from "./dialo
 
 type Panel = "inventory" | "skills" | "map" | "dialogue" | "help" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
+type NpcId = "rowan" | "squirrel";
 type LogEntry = { id: number; tone: "system" | "good" | "bad" | "plain"; text: string };
 type InteractionTarget = {
   id: string;
   label: string;
-  kind: "door" | "prop";
+  kind: "door" | "prop" | "npc";
   locked?: boolean;
   lockpick?: boolean;
   inaccessible?: boolean;
   interior?: string;
   action?: "search" | "inspect";
+  npcId?: NpcId;
+  canTalk?: boolean;
 };
 type NpcState = {
   trust: number;
@@ -205,7 +208,7 @@ function Sprite({ row, col, label, className = "" }: { row: number; col: number;
   );
 }
 
-function NpcActor({ className, status, statusTone, row, col, label, motion = "idle", facing = "right", position, transitionMs = 0, onClick }: {
+function NpcActor({ className, status, statusTone, row, col, label, motion = "idle", facing = "right", position, transitionMs = 0, selected = false, onClick, onContextMenu }: {
   className: string;
   status: string;
   statusTone: "npc" | "enemy";
@@ -216,14 +219,18 @@ function NpcActor({ className, status, statusTone, row, col, label, motion = "id
   facing?: "left" | "right";
   position: WorldPoint;
   transitionMs?: number;
+  selected?: boolean;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return <button
-    className={`npc-actor ${className} ${motion}`}
+    className={`npc-actor ${className} ${motion}${selected ? " targeted" : ""}`}
     data-facing={facing}
     style={{ left: `${position.x}%`, top: `${position.y}%`, transitionDuration: `${transitionMs}ms` }}
     onClick={onClick}
+    onContextMenu={onContextMenu}
     aria-label={label}
+    aria-pressed={selected}
   >
     <div className={`status-tag ${statusTone}`}>{status}</div>
     <Sprite row={row} col={col} label={label} />
@@ -317,6 +324,11 @@ const interactions: Record<string, InteractionTarget> = {
   saltworksDoor: { id: "saltworks-door", label: "Saltworks Exchange", kind: "door", inaccessible: true },
 };
 
+const npcInteractions: Record<NpcId, InteractionTarget> = {
+  rowan: { id: "npc-rowan", label: "Rowan Vale", kind: "npc", npcId: "rowan", canTalk: true },
+  squirrel: { id: "npc-squirrel", label: "Rabid Squirrel", kind: "npc", npcId: "squirrel", canTalk: false },
+};
+
 const cityDecor = [
   { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-a", x: 42, y: 54, width: 38, height: 42, rx: 1.05, ry: .8 },
   { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-b", x: 62, y: 82, width: 38, height: 42, rx: 1.05, ry: .8 },
@@ -353,7 +365,10 @@ export default function Home() {
   const [maxHp, setMaxHp] = useState(32);
   const [ap, setAp] = useState(7);
   const [enemyHp, setEnemyHp] = useState(18);
+  const [rowanHp, setRowanHp] = useState(26);
   const [combat, setCombat] = useState<CombatState>("idle");
+  const [selectedNpc, setSelectedNpc] = useState<NpcId | null>(null);
+  const [combatTarget, setCombatTarget] = useState<NpcId | null>(null);
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(35);
   const [chips, setChips] = useState(37);
@@ -427,6 +442,8 @@ export default function Home() {
       if (typeof save.maxHp === "number") setMaxHp(save.maxHp);
       if (typeof save.ap === "number") setAp(save.ap);
       if (typeof save.enemyHp === "number") setEnemyHp(save.enemyHp);
+      if (typeof save.rowanHp === "number") setRowanHp(save.rowanHp);
+      if (save.combatTarget === "rowan" || save.combatTarget === "squirrel") { setCombatTarget(save.combatTarget); setSelectedNpc(save.combatTarget); }
       if (["idle", "player", "enemy", "won"].includes(save.combat)) setCombat(save.combat);
       if (typeof save.skillPoints === "number") setSkillPoints(save.skillPoints);
       if (Array.isArray(save.unlockedDoors)) setUnlockedDoors(save.unlockedDoors);
@@ -441,9 +458,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!saveReady) return;
-    const save = { level, xp, chips, skills, skillPoints, npc, worldFlags, conversation: conversation.slice(-40), location, hp, maxHp, ap, enemyHp, combat, unlockedDoors, playerPosition, inventory };
+    const save = { level, xp, chips, skills, skillPoints, npc, worldFlags, conversation: conversation.slice(-40), location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory };
     localStorage.setItem("life-is-a-gamble-save", JSON.stringify(save));
-  }, [saveReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, combat, unlockedDoors, playerPosition, inventory]);
+  }, [saveReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, unlockedDoors, playerPosition, inventory]);
 
   useEffect(() => {
     if (!walking) return;
@@ -462,7 +479,7 @@ export default function Home() {
     const timer = setTimeout(() => {
       const ordered = patrolWaypoints.map((_, offset) => patrolWaypoints[(enemyPatrolIndex.current + offset) % patrolWaypoints.length]);
       const patrolAvoidance: CollisionZone[] = [
-        { kind: "ellipse", x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" },
+        ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
         { kind: "ellipse", x: playerPosition.x, y: playerPosition.y, rx: 1.5, ry: 1.1, label: "player" },
       ];
       const next = ordered.find((candidate) => segmentIsClear(enemyPosition, candidate, patrolAvoidance));
@@ -479,7 +496,7 @@ export default function Home() {
       enemyStopTimer.current = setTimeout(() => setEnemyMoving(false), duration);
     }, 1800 + (enemyPatrolIndex.current % 3) * 650);
     return () => clearTimeout(timer);
-  }, [mainMenu, interior, enemyHp, combat, enemyPosition, playerPosition.x, playerPosition.y]);
+  }, [mainMenu, interior, enemyHp, rowanHp, combat, enemyPosition, playerPosition.x, playerPosition.y]);
 
   useEffect(() => () => {
     movementToken.current += 1;
@@ -490,6 +507,9 @@ export default function Home() {
   const xpGoal = level * 100;
   const combatFrame = combat === "player" ? 3 : combat === "enemy" ? 4 : null;
   const squirrelFrame = enemyHp <= 0 ? 4 : combat === "enemy" ? 3 : isSpinning || enemyMoving ? 1 : 0;
+  const selectedTargetName = selectedNpc === "rowan" ? "ROWAN VALE" : selectedNpc === "squirrel" ? "RABID SQUIRREL" : "NO TARGET";
+  const selectedTargetHp = selectedNpc === "rowan" ? rowanHp : selectedNpc === "squirrel" ? enemyHp : 0;
+  const selectedTargetMaxHp = selectedNpc === "rowan" ? 26 : selectedNpc === "squirrel" ? 18 : 1;
 
   const addLog = (text: string, tone: LogEntry["tone"] = "plain") => {
     setLog((old) => [...old.slice(-5), { id: logId.current++, tone, text }]);
@@ -530,7 +550,7 @@ export default function Home() {
     const x = Math.max(WALKABLE_BOUNDS.x1, Math.min(WALKABLE_BOUNDS.x2, ((event.clientX - bounds.left) / bounds.width) * 100));
     const y = Math.max(WALKABLE_BOUNDS.y1, Math.min(WALKABLE_BOUNDS.y2, ((event.clientY - bounds.top) / bounds.height) * 100));
     const actorZones: CollisionZone[] = [
-      { kind: "ellipse", x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" },
+      ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
       ...(enemyHp > 0 ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.35, ry: 1, label: "rabid squirrel" }] : []),
     ];
     const requested = { x, y };
@@ -548,7 +568,24 @@ export default function Home() {
   const openInteraction = (event: React.MouseEvent, target: InteractionTarget) => {
     event.preventDefault();
     event.stopPropagation();
-    setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 235), y: Math.min(event.clientY, window.innerHeight - 175), target });
+    setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 285), y: Math.min(event.clientY, window.innerHeight - 220), target });
+  };
+
+  const selectNpc = (npcId: NpcId) => {
+    const alive = npcId === "rowan" ? rowanHp > 0 : enemyHp > 0;
+    if (!alive) return;
+    setContextMenu(null);
+    setSelectedNpc(npcId);
+    if (combat === "won" && combatTarget !== npcId) {
+      setCombat("idle");
+      setCombatTarget(null);
+    }
+    if (selectedNpc !== npcId) addLog(`${npcId === "rowan" ? "Rowan Vale" : "Rabid Squirrel"} targeted. Combat actions are ready.`, "system");
+  };
+
+  const openNpcInteraction = (event: React.MouseEvent, npcId: NpcId) => {
+    selectNpc(npcId);
+    openInteraction(event, npcInteractions[npcId]);
   };
 
   const enterTarget = (target: InteractionTarget) => {
@@ -647,61 +684,91 @@ export default function Home() {
     return { score: roll + (lucky ? 18 : 0), jackpot, symbols: finalSymbols };
   };
 
-  const startCombat = () => {
-    if (enemyHp <= 0) return;
+  const startCombat = (requestedTarget?: NpcId) => {
+    const target = requestedTarget ?? selectedNpc ?? "squirrel";
+    const targetHp = target === "rowan" ? rowanHp : enemyHp;
+    if (targetHp <= 0) return false;
+    if (combat === "player" && combatTarget === target) return true;
+    const startingEncounter = combat !== "player";
     audio.play("enemyAggro");
+    setSelectedNpc(target);
+    setCombatTarget(target);
     setCombat("player");
-    setAp(7);
-    addLog("TURN 1 · The squirrel bares wet, yellow teeth.", "bad");
+    if (startingEncounter) setAp(7);
+    if (target === "rowan") {
+      if (!worldFlags.includes("Courier attacked Rowan")) setWorldFlags((flags) => [...flags, "Courier attacked Rowan"]);
+      setNpc((state) => ({ ...state, trust: clamp(state.trust - 24), respect: clamp(state.respect - 8), fear: clamp(state.fear + 18), mood: "Hostile", opinion: "You drew on me. Whatever this was before, it is over.", memories: [...state.memories.slice(-7), "The Courier raised a weapon against me."] }));
+      setPanel(null);
+      addLog("HOSTILITIES · Rowan reaches for her sidearm.", "bad");
+    } else addLog("TURN 1 · The squirrel bares wet, yellow teeth.", "bad");
+    return true;
   };
 
-  const enemyTurn = async () => {
+  const enemyTurn = async (turnTarget: NpcId | null = combatTarget) => {
+    if (!turnTarget) return;
     setCombat("enemy");
-    audio.play("enemyAttack");
+    audio.play(turnTarget === "rowan" ? "shoot" : "enemyAttack");
     await new Promise((resolve) => setTimeout(resolve, 650));
     const dodgeChance = skills.Survival * 4 + luck * 2;
     const roll = Math.floor(Math.random() * 100);
     if (roll < dodgeChance) {
       audio.play("enemyNormal");
-      addLog("You read the lunge and step aside.", "good");
+      addLog(turnTarget === "rowan" ? "You dive aside as Rowan's shot sparks off the curb." : "You read the lunge and step aside.", "good");
     } else {
-      const damage = 3 + Math.floor(Math.random() * 5);
+      const damage = (turnTarget === "rowan" ? 5 : 3) + Math.floor(Math.random() * 5);
       setHp((v) => Math.max(1, v - damage));
-      addLog(`Rabid Squirrel bites for ${damage} damage.`, "bad");
+      addLog(`${turnTarget === "rowan" ? "Rowan shoots" : "Rabid Squirrel bites"} for ${damage} damage.`, "bad");
     }
     setAp(7);
     setCombat("player");
   };
 
   const attack = async (aimed = false) => {
-    if (combat !== "player" || isSpinning) return;
+    const target = selectedNpc;
+    if (!target || combat === "enemy" || isSpinning) {
+      if (!target) addLog("Select an NPC before attacking.", "bad");
+      return;
+    }
+    const targetHp = target === "rowan" ? rowanHp : enemyHp;
+    if (targetHp <= 0) return;
+    const enteringCombat = combat !== "player" || combatTarget !== target;
+    const startingEncounter = combat !== "player";
     const cost = aimed ? 5 : 3;
-    if (ap < cost) {
+    const availableAp = startingEncounter ? 7 : ap;
+    if (availableAp < cost) {
       addLog("Not enough Action Points.", "bad");
       return;
     }
-    setAp((v) => v - cost);
+    if (enteringCombat) startCombat(target);
+    setAp(availableAp - cost);
     audio.play("shoot");
     const result = await spinFate(aimed ? "Aimed shot" : "Attack check");
     const hitTarget = 38 + skills.Guns * 7 + luck * 2 + (aimed ? 16 : 0);
     if (result.score <= hitTarget || result.jackpot) {
       const damage = 5 + skills.Guns + (aimed ? 3 : 0) + (result.jackpot ? 8 : 0);
-      const remaining = Math.max(0, enemyHp - damage);
-      setEnemyHp(remaining);
+      const remaining = Math.max(0, targetHp - damage);
+      if (target === "rowan") setRowanHp(remaining);
+      else setEnemyHp(remaining);
       audio.play("enemyDamaged");
-      addLog(`${aimed ? "AIMED" : "SNAP"} SHOT · ${damage} damage.`, "good");
+      addLog(`${aimed ? "AIMED" : "SNAP"} SHOT · ${damage} damage to ${target === "rowan" ? "Rowan" : "Rabid Squirrel"}.`, "good");
       if (remaining === 0) {
         setCombat("won");
-        setChips((v) => v + 6);
-        awardXp(65);
-        if (!worldFlags.includes("Salt Yard squirrel killed")) setWorldFlags((v) => [...v, "Salt Yard squirrel killed"]);
-        addLog("ENCOUNTER WON · +65 XP · +6 chips · Squirrel Tail found.", "good");
+        if (target === "rowan") {
+          awardXp(40);
+          setWorldFlags((flags) => [...new Set([...flags, "Rowan killed by Courier"])]);
+          addLog("ROWAN FALLS · +40 XP · Her story ends here.", "bad");
+        } else {
+          setChips((v) => v + 6);
+          awardXp(65);
+          if (!worldFlags.includes("Salt Yard squirrel killed")) setWorldFlags((v) => [...v, "Salt Yard squirrel killed"]);
+          addLog("ENCOUNTER WON · +65 XP · +6 chips · Squirrel Tail found.", "good");
+        }
         return;
       }
     } else {
       addLog("The shot powders a patch of dead asphalt.", "bad");
     }
-    if (ap - cost < 3) enemyTurn();
+    if (availableAp - cost < 3) enemyTurn(target);
   };
 
   const defend = async () => {
@@ -711,8 +778,8 @@ export default function Home() {
     if (result.score < 45 + skills.Survival * 5) {
       setHp((v) => Math.min(maxHp, v + 2));
       addLog("You find solid footing. +2 HP.", "good");
-    } else addLog("You brace. The squirrel circles.");
-    enemyTurn();
+    } else addLog(combatTarget === "rowan" ? "You brace behind a rusted mailbox. Rowan keeps her sights trained." : "You brace. The squirrel circles.");
+    enemyTurn(combatTarget);
   };
 
   const travel = async (place: (typeof cities)[number]) => {
@@ -840,7 +907,7 @@ export default function Home() {
         return `ROWAN ATTACKS · ${damage} damage${remaining ? "" : " · enemy defeated"}`;
       }
       case "set_combat":
-        if (action.target === "player") { startCombat(); return "COMBAT STARTED · Dialogue became hostile"; }
+        if (action.target === "player") { startCombat("rowan"); return "COMBAT STARTED · Dialogue became hostile"; }
         if (action.target === "idle") { setCombat("idle"); return "COMBAT ENDED · Hostility stood down"; }
         if (action.target === "won" && enemyHp <= 0) { setCombat("won"); return "ENCOUNTER RESOLVED"; }
         return null;
@@ -868,7 +935,7 @@ export default function Home() {
         const destinationPoint = anchors[action.target];
         if (!destinationPoint) return null;
         const actorZones: CollisionZone[] = [
-          { kind: "ellipse", x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" },
+          ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
           ...(enemyHp > 0 ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.35, ry: 1, label: "rabid squirrel" }] : []),
         ];
         const route = findWalkPath(playerPosition, destinationPoint, actorZones);
@@ -943,7 +1010,7 @@ export default function Home() {
           message, npc, skills, luck, slot: slot.score, worldFlags, location,
           history: conversation.slice(-24),
           game: {
-            hp, maxHp, ap, enemyHp, combat, level, xp, xpGoal, chips, skillPoints,
+            hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, level, xp, xpGoal, chips, skillPoints,
             unlockedDoors, interior, playerPosition,
             inventory: inventory.map((item) => ({ id: item.id, name: item.name, equipped: item.equipped })),
           } satisfies DialogueGameSnapshot,
@@ -1081,30 +1148,35 @@ export default function Home() {
               <div className="entity-ring" />
             </div>
 
-            <NpcActor
+            {rowanHp > 0 && <NpcActor
               className="downtown-rowan"
-              status="ROWAN · TALK"
+              status={`ROWAN · ${selectedNpc === "rowan" ? "TARGETED" : "WARY"}`}
               statusTone="npc"
               row={2}
               col={npc.trust > 35 ? 3 : 0}
-              label="Talk to Rowan"
+              label="Target Rowan Vale"
               position={{ x: 38, y: 72 }}
-              onClick={(event) => { event.stopPropagation(); setPanel("dialogue"); }}
-            />
+              selected={selectedNpc === "rowan"}
+              motion={combatTarget === "rowan" && combat !== "idle" ? "combat" : "idle"}
+              onClick={(event) => { event.stopPropagation(); selectNpc("rowan"); }}
+              onContextMenu={(event) => openNpcInteraction(event, "rowan")}
+            />}
             {enemyHp > 0 && <NpcActor
               className="downtown-squirrel"
-              status={`RABID SQUIRREL · ${enemyHp}/18`}
+              status={`RABID SQUIRREL · ${selectedNpc === "squirrel" ? "TARGETED" : `${enemyHp}/18`}`}
               statusTone="enemy"
               row={1}
               col={squirrelFrame}
-              label="Engage rabid squirrel"
-              motion={combat === "idle" ? (enemyMoving ? "patrol" : "idle") : "combat"}
+              label="Target rabid squirrel"
+              motion={combatTarget === "squirrel" && combat !== "idle" ? "combat" : enemyMoving ? "patrol" : "idle"}
               facing={enemyFacing}
               position={enemyPosition}
               transitionMs={enemyMoveDuration}
-              onClick={(event) => { event.stopPropagation(); startCombat(); }}
+              selected={selectedNpc === "squirrel"}
+              onClick={(event) => { event.stopPropagation(); selectNpc("squirrel"); }}
+              onContextMenu={(event) => openNpcInteraction(event, "squirrel")}
             />}
-            <div className="control-hint"><b>LEFT CLICK</b> WALK <i>•</i> <b>RIGHT CLICK</b> INTERACT <i>•</i> Doors remember locks</div>
+            <div className="control-hint"><b>LEFT CLICK</b> WALK / TARGET NPC <i>•</i> <b>RIGHT CLICK</b> TALK / INTERACT</div>
           </> : <div className="interior-scene">
             <div className="interior-wall left-wall" /><div className="interior-wall right-wall" />
             <EnvSprite row={0} col={3} label="Interior brick floor" className="interior-floor" />
@@ -1120,10 +1192,13 @@ export default function Home() {
               {contextMenu.target.inaccessible ? <button disabled><b>×</b><span>INACCESSIBLE<small>Collapsed beyond this point</small></span></button> : <button onClick={() => enterTarget(contextMenu.target)}><b>↳</b><span>ENTER<small>{contextMenu.target.locked && !unlockedDoors.includes(contextMenu.target.id) ? "Door is locked" : "Open passage"}</small></span></button>}
               {contextMenu.target.lockpick && !unlockedDoors.includes(contextMenu.target.id) && <button onClick={() => lockpickTarget(contextMenu.target)}><b>⌁</b><span>LOCKPICK<small>Mechanics {skills.Mechanics} + Luck {luck}</small></span></button>}
               <button onClick={() => { addLog(`${contextMenu.target.label}: ${contextMenu.target.inaccessible ? "the structure behind it has collapsed." : "a century-old entrance reinforced by recent hands."}`); setContextMenu(null); }}><b>?</b><span>EXAMINE<small>Perception check</small></span></button>
+            </> : contextMenu.target.kind === "npc" ? <>
+              <button disabled={!contextMenu.target.canTalk || contextMenu.target.npcId !== "rowan" || rowanHp <= 0 || combat === "enemy"} onClick={() => { setContextMenu(null); setPanel("dialogue"); }}><b>“</b><span>TALK<small>{contextMenu.target.canTalk ? "Open dialogue" : "It cannot be reasoned with"}</small></span></button>
+              <button onClick={() => { const npcId = contextMenu.target.npcId; setContextMenu(null); if (npcId) startCombat(npcId); }} disabled={!contextMenu.target.npcId || combat === "enemy"}><b>⌖</b><span>ATTACK<small>Initiate turn-based combat</small></span></button>
+              <button onClick={() => { addLog(`${contextMenu.target.label}: ${contextMenu.target.npcId === "rowan" ? npc.opinion : "Fever-bright eyes track every movement."}`); setContextMenu(null); }}><b>?</b><span>EXAMINE<small>Read current disposition</small></span></button>
             </> : <button onClick={() => useProp(contextMenu.target)}><b>⌕</b><span>{contextMenu.target.action === "search" ? "SEARCH" : "INSPECT"}<small>Interact with object</small></span></button>}
           </div>}
-          {combat === "idle" && enemyHp > 0 && <button className="engage-prompt city-engage" onClick={(e) => { e.stopPropagation(); startCombat(); }}><span>ALLEY THREAT</span> Engage rabid squirrel <kbd>E</kbd></button>}
-          {combat === "won" && <div className="victory-stamp">ARMORY ALLEY CLEARED <span>+65 XP</span></div>}
+          {combat === "won" && <div className="victory-stamp">{combatTarget === "rowan" ? "ROWAN DEFEATED" : "ARMORY ALLEY CLEARED"} <span>{combatTarget === "rowan" ? "+40 XP" : "+65 XP"}</span></div>}
         </section>
 
         <aside className="right-panel">
@@ -1135,15 +1210,16 @@ export default function Home() {
           <section className="turn-panel">
             <div className="section-heading"><span>{combat === "player" ? "YOUR TURN" : combat === "enemy" ? "ENEMY TURN" : "FIELD ACTIONS"}</span><b>{ap} AP</b></div>
             <div className="ap-pips">{Array.from({ length: 7 }, (_, i) => <i key={i} className={i < ap ? "filled" : ""} />)}</div>
+            <div className={`target-readout ${selectedNpc ? "locked" : ""}`}><div><small>ACTIVE TARGET</small><strong>{selectedTargetName}</strong></div><span>{selectedNpc ? `HP ${selectedTargetHp}/${selectedTargetMaxHp}` : "CLICK AN NPC"}</span></div>
             <div className="weapon-card">
               <div className="weapon-art">⌐<span>• • •</span></div>
               <div><small>EQUIPPED</small><strong>PIPE PISTOL</strong><span>5–9 DMG · 71% BASE</span></div>
             </div>
             <div className="action-grid">
-              <button className={selectedAction === "Pistol" ? "selected" : ""} onClick={() => { setSelectedAction("Pistol"); attack(false); }} disabled={combat !== "player" || isSpinning}><span>3 AP</span><b>SNAP SHOT</b><em>Guns + Luck</em></button>
-              <button onClick={() => { setSelectedAction("Aim"); attack(true); }} disabled={combat !== "player" || isSpinning}><span>5 AP</span><b>AIMED SHOT</b><em>+16% hit</em></button>
+              <button className={selectedAction === "Pistol" ? "selected" : ""} onClick={() => { setSelectedAction("Pistol"); attack(false); }} disabled={!selectedNpc || selectedTargetHp <= 0 || combat === "enemy" || isSpinning}><span>3 AP</span><b>SNAP SHOT</b><em>{combat === "idle" ? "Start combat" : "Guns + Luck"}</em></button>
+              <button onClick={() => { setSelectedAction("Aim"); attack(true); }} disabled={!selectedNpc || selectedTargetHp <= 0 || combat === "enemy" || isSpinning}><span>5 AP</span><b>AIMED SHOT</b><em>{combat === "idle" ? "Start combat" : "+16% hit"}</em></button>
               <button onClick={defend} disabled={combat !== "player" || isSpinning}><span>2 AP</span><b>BRACE</b><em>Survival check</em></button>
-              <button onClick={() => setPanel("dialogue")} disabled={combat === "enemy"}><span>—</span><b>TALK</b><em>Rowan</em></button>
+              <button onClick={() => setPanel("dialogue")} disabled={selectedNpc !== "rowan" || rowanHp <= 0 || combat === "enemy"}><span>—</span><b>TALK</b><em>{selectedNpc === "rowan" ? "Rowan" : "Target Rowan"}</em></button>
             </div>
           </section>
 

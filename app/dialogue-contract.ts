@@ -48,7 +48,10 @@ export type DialogueGameSnapshot = {
   maxHp: number;
   ap: number;
   enemyHp: number;
+  rowanHp: number;
   combat: string;
+  combatTarget: "rowan" | "squirrel" | null;
+  selectedNpc: "rowan" | "squirrel" | null;
   level: number;
   xp: number;
   xpGoal: number;

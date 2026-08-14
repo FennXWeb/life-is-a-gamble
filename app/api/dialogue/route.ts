@@ -210,7 +210,7 @@ const actionGuide = `You may request only these browser-side game actions. The a
 - change_hp: target player, amount -12..12, only for immediate treatment or physical harm in the scene.
 - change_ap: target player, amount -7..7, only when an immediate action affects the current turn.
 - damage_enemy: target squirrel, amount 1..12, only if Rowan physically attacks the present enemy.
-- set_combat: target idle, player, or won. This controls the current squirrel encounter only; use player if dialogue directly causes that creature to aggro, and never use won unless it is already defeated. Hostility with Rowan uses a world flag plus close_dialogue because Rowan is not a combat target yet.
+- set_combat: target idle, player, or won. Rowan and the squirrel are both valid combat targets in the current game snapshot. In Rowan dialogue, use player if the exchange directly causes Rowan to attack; use idle if both sides genuinely stand down, and never use won unless the active target is already defeated.
 - unlock_door: target supply-door, museum-door, or city-hall-door, only if Rowan actually provides a key or opens it now.
 - enter_interior: target Clinton Provisioners, Erie Canal Museum Archive, or City Hall Records Annex, only when Rowan physically leads the Courier through an accessible entrance.
 - move_player: target rowan, clinton_square, salina_crossing, or squirrel_alley, only when Rowan physically leads or shoves the Courier there now.
