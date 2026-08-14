@@ -6,12 +6,18 @@ type SpeechRequest = {
 
 const voiceProfiles = {
   player: {
-    voice: "coral",
-    instructions: "A capable young wasteland courier. Natural conversational American English, grounded and direct, medium pace, never theatrical.",
+    voice: "cedar",
+    displayName: "The Courier",
+    demographics: "masculine-presenting adult, approximately 28 to 35 years old",
+    accent: "inland Northern American English with only a faint Upstate New York influence",
+    delivery: "weathered baritone, grounded and direct, medium pace, restrained emotion, never theatrical",
   },
   rowan: {
-    voice: "cedar",
-    instructions: "Rowan Vale, a road-worn Upstate New York wanderer in her thirties. Low, dry, guarded, intelligent, understated emotion, natural pauses, never announcer-like.",
+    voice: "marin",
+    displayName: "Rowan Vale",
+    demographics: "feminine-presenting adult woman, approximately 32 to 38 years old",
+    accent: "inland Northern American English with a subtle Upstate New York cadence",
+    delivery: "low contralto impression, dry, guarded, intelligent, understated emotion, natural pauses, never announcer-like",
   },
 } as const;
 
@@ -32,7 +38,7 @@ export async function POST(request: Request) {
       model: process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
       voice: profile.voice,
       input: text,
-      instructions: `${profile.instructions} Current emotional color: ${String(data.mood || "neutral").slice(0, 40)}.`,
+      instructions: `Perform ${profile.displayName}, a ${profile.demographics}. Accent and cadence: ${profile.accent}. Vocal identity: ${profile.delivery}. Keep this identity consistent across every line. Current emotional color: ${String(data.mood || "neutral").slice(0, 40)}. Let mood affect intensity and timing, not the character's age, gender presentation, accent, or core timbre.`,
       response_format: "mp3",
     }),
   });

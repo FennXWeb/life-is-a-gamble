@@ -436,3 +436,33 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .main-menu-actions{display:grid;grid-template-columns:1fr 1.15fr;gap:12px}.main-menu-actions button{min-height:56px;padding:10px;border:2px solid #62543a;background-image:linear-gradient(#293020df,#11170ff0),var(--hud-atlas);background-size:auto,300% 200%;background-position:0 0,50% 0;color:#d5c7a5;font:700 11px monospace;letter-spacing:.08em;cursor:pointer;box-shadow:inset 0 0 11px #0008}.main-menu-actions button:hover{border-color:#d1a052;color:#ffe3a1;filter:brightness(1.13)}.main-menu-actions .enter-game{border-color:#a36d3c;background-image:linear-gradient(#794328d9,#351c13ed),var(--hud-atlas);background-position:0 0,0 100%;color:#f2cc8d}.main-menu-card>em{display:block;margin-top:17px;color:#77776a;font:9px monospace;font-style:normal}
 .location-block{position:relative;padding-right:172px}.audio-controls{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:grid;grid-template-columns:1fr 1fr;gap:5px}.audio-controls button{width:72px;height:34px;border:1px solid #5d6048;background-image:linear-gradient(#20271be6,#0e130deb),var(--hud-atlas);background-size:auto,300% 200%;background-position:0 0,50% 0;color:#aeb590;font:700 9px monospace;cursor:pointer;box-shadow:inset 0 0 7px #000}.audio-controls button[aria-pressed="false"]{color:#7a7466;border-color:#4a4639;filter:grayscale(.7)}.audio-controls button:hover{border-color:#c4964a;color:#f1d18d}
 @media(max-width:1250px){.location-block{padding-right:90px}.audio-controls{right:6px;grid-template-columns:1fr}.audio-controls button{width:72px;height:27px;font-size:8px}.main-menu-card{padding:36px 40px 31px}.main-menu-card h2{font-size:42px}}
+
+/* Portrait crops use the animation atlas as character art without exposing full-body frames. */
+.portrait,.npc-portrait{isolation:isolate;background:radial-gradient(circle at 48% 22%,#8d5b36,#44291c 64%,#17130f);}
+.portrait .sprite{width:100%;height:100%;background-size:900% 540%;background-position:0 0!important;filter:drop-shadow(0 8px 7px #0008) saturate(.9) contrast(1.08);}
+.npc-portrait{position:relative;height:248px;background:radial-gradient(circle at 48% 27%,#9a6238,#4c2d1e 63%,#17130f);box-shadow:inset 0 -22px 32px #160d09aa;}
+.npc-portrait::after{content:"ROWAN VALE · AGE 35";position:absolute;z-index:2;left:13px;bottom:11px;padding:5px 8px;border:1px solid #8d6b3d;background:#11130fe8;color:#d4b579;font:700 8px monospace;letter-spacing:.12em;}
+.npc-portrait .sprite{width:100%;height:100%;margin:0;background-size:700% 420%;background-position:0 82%!important;filter:drop-shadow(0 13px 11px #000a) saturate(.9) contrast(1.08);}
+
+/* World props are authored against the 104px player height; large objects keep real mass. */
+.barricade-prop{left:58%;bottom:12%;width:176px;height:120px;}
+.rubble-prop{width:126px;height:94px;}
+.tree-prop{width:104px;height:138px;}
+.decor-sprite{filter:drop-shadow(7px 12px 8px #050605c7) saturate(.86) contrast(1.1);}
+
+/* Jackpot payoff: a separate cabinet event, coin burst, and readable reward callout. */
+.slot-machine.jackpot{z-index:20;animation:jackpotCabinet .18s ease-in-out 8 alternate;box-shadow:0 0 0 5px #2a1609,0 0 32px #ffbf3acc,0 12px 34px #000,inset 0 0 28px #ffb52b55;}
+.slot-machine.jackpot .slot-lamps i{background:#fff1a4;box-shadow:0 0 5px #fff,0 0 15px #ffc53d;animation:jackpotLamp .18s steps(2,end) infinite;}
+.slot-machine.jackpot .reels div{border-color:#e5b84f;box-shadow:inset 0 0 17px #fff5b4,0 0 13px #ffb21f;}
+.jackpot-burst{position:absolute;z-index:40;inset:-38px -76px -22px;pointer-events:none;display:grid;place-content:center;text-align:center;overflow:visible;background:radial-gradient(ellipse at center,#fff6ad7d 0,#d9912338 27%,transparent 67%);animation:jackpotReveal 2.55s ease-out both;}
+.jackpot-burst strong{font:900 52px/1 Georgia,serif;letter-spacing:.08em;color:#fff0a1;text-shadow:0 2px #7e260f,0 0 9px #fff,0 0 26px #ff9f19;animation:jackpotTitle .34s ease-out both;}
+.jackpot-burst span{font:900 21px/1.1 Georgia,serif;letter-spacing:.25em;color:#ffe7a0;text-shadow:2px 2px #6d2414,0 0 12px #ffba38;}
+.jackpot-burst em{margin-top:5px;font:800 12px monospace;font-style:normal;letter-spacing:.18em;color:#d8f49a;text-shadow:0 1px 4px #000;}
+.jackpot-burst i{--x:0px;--y:-110px;position:absolute;left:50%;top:50%;width:15px;height:15px;border-radius:50%;border:2px solid #8f5017;background:radial-gradient(circle at 34% 30%,#fff6a2 0 13%,#f5c347 17% 48%,#9a5419 72%);box-shadow:0 0 7px #ffc34d;animation:jackpotCoin 1.55s cubic-bezier(.15,.66,.24,1) both;}
+.jackpot-burst i:nth-of-type(1){--x:-214px;--y:-102px;animation-delay:.03s}.jackpot-burst i:nth-of-type(2){--x:-167px;--y:84px;animation-delay:.11s}.jackpot-burst i:nth-of-type(3){--x:-116px;--y:-137px;animation-delay:.18s}.jackpot-burst i:nth-of-type(4){--x:-58px;--y:112px;animation-delay:.06s}.jackpot-burst i:nth-of-type(5){--x:-23px;--y:-146px;animation-delay:.22s}.jackpot-burst i:nth-of-type(6){--x:39px;--y:128px;animation-delay:.14s}.jackpot-burst i:nth-of-type(7){--x:76px;--y:-136px;animation-delay:.08s}.jackpot-burst i:nth-of-type(8){--x:124px;--y:104px;animation-delay:.2s}.jackpot-burst i:nth-of-type(9){--x:173px;--y:-104px;animation-delay:.12s}.jackpot-burst i:nth-of-type(10){--x:211px;--y:67px;animation-delay:.04s}.jackpot-burst i:nth-of-type(11){--x:-202px;--y:42px;animation-delay:.25s}.jackpot-burst i:nth-of-type(12){--x:205px;--y:-29px;animation-delay:.17s}
+@keyframes jackpotCabinet{to{transform:translateY(-3px) rotate(.25deg);filter:brightness(1.2)}}
+@keyframes jackpotLamp{50%{opacity:.3;transform:scale(.72)}}
+@keyframes jackpotReveal{0%{opacity:0;transform:scale(.58)}12%,72%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.08)}}
+@keyframes jackpotTitle{0%{transform:scale(.35) rotate(-7deg)}70%{transform:scale(1.14) rotate(1deg)}100%{transform:scale(1)}}
+@keyframes jackpotCoin{0%{opacity:0;transform:translate(-50%,-50%) scale(.25) rotate(0)}16%{opacity:1}72%{opacity:1;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) scale(1.15) rotate(520deg)}100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y) + 62px)) scale(.7) rotate(720deg)}}
+@media(prefers-reduced-motion:reduce){.slot-machine.jackpot,.slot-machine.jackpot .slot-lamps i,.jackpot-burst,.jackpot-burst strong,.jackpot-burst i{animation-duration:.01ms;animation-iteration-count:1}}

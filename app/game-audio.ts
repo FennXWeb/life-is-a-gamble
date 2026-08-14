@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type GameSfx = "ui" | "door" | "lockpick" | "lockBreak" | "loot" | "shoot" | "enemyNormal" | "enemyDamaged" | "enemyAttack" | "enemyAggro" | "equip" | "slotSpin" | "slotWin" | "slotLose";
+export type GameSfx = "ui" | "door" | "lockpick" | "lockBreak" | "loot" | "shoot" | "enemyNormal" | "enemyDamaged" | "enemyAttack" | "enemyAggro" | "equip" | "slotSpin" | "slotWin" | "slotLose" | "slotJackpot";
 export type MusicMode = "menu" | "ambient" | "combat" | "dialogue" | "interior";
 type MusicManifest = { tracks: Record<MusicMode, string[]> };
 
@@ -162,6 +162,18 @@ export function useGameAudio() {
     if (sound === "slotWin") {
       [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => sweep(frequency, frequency * 1.015, .24, .075, "triangle", index * .11));
       sweep(1318.5, 1568, .42, .07, "sine", .48);
+    }
+    if (sound === "slotJackpot") {
+      [392, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((frequency, index) => {
+        sweep(frequency, frequency * 1.03, .36, .105, index % 2 ? "triangle" : "sine", index * .09);
+        sweep(frequency * 2, frequency * 2.02, .18, .035, "square", index * .09 + .025);
+      });
+      for (let coin = 0; coin < 13; coin++) {
+        const delay = .52 + coin * .045;
+        sweep(1680 + (coin % 4) * 210, 1180 + (coin % 5) * 120, .075, .045, "triangle", delay);
+        noiseBurst(ctx, bus, .035, .025, 4200, delay);
+      }
+      sweep(196, 784, .78, .13, "sawtooth", .42);
     }
     if (sound === "slotLose") {
       sweep(330, 220, .22, .07, "square");

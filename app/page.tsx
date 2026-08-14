@@ -42,7 +42,7 @@ const fixedCollisionZones: CollisionZone[] = [
   { kind: "rect", x1: 0, x2: 100, y1: 0, y2: 45.6, label: "North Fayette building frontage" },
   { kind: "ellipse", x: 70, y: 79, rx: 5.7, ry: 2.7, label: "abandoned sedan" },
   { kind: "ellipse", x: 40, y: 57, rx: 1.5, ry: 1.25, label: "street lamp" },
-  { kind: "ellipse", x: 63, y: 84, rx: 4.6, ry: 2.2, label: "scrap barricade" },
+  { kind: "ellipse", x: 58, y: 84, rx: 6.2, ry: 2.8, label: "scrap barricade" },
   { kind: "ellipse", x: 34, y: 61, rx: 3.2, ry: 1.8, label: "dead tree planter" },
 ];
 
@@ -330,24 +330,24 @@ const npcInteractions: Record<NpcId, InteractionTarget> = {
 };
 
 const cityDecor = [
-  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-a", x: 42, y: 54, width: 38, height: 42, rx: 1.05, ry: .8 },
-  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-b", x: 62, y: 82, width: 38, height: 42, rx: 1.05, ry: .8 },
-  { row: 0, col: 1, label: "Abandoned payphone", className: "decor-payphone", x: 3, y: 53, width: 62, height: 82, rx: 1.8, ry: 1.15 },
-  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-a", x: 65, y: 53, width: 48, height: 54, rx: 1.35, ry: 1 },
-  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-b", x: 94, y: 81, width: 48, height: 54, rx: 1.35, ry: 1 },
-  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-a", x: 13, y: 52, width: 58, height: 58, rx: 1.9, ry: 1.25 },
-  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-b", x: 87, y: 72, width: 58, height: 58, rx: 1.9, ry: 1.25 },
-  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-a", x: 34, y: 52, width: 44, height: 48, rx: 1.25, ry: .9 },
-  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-b", x: 77, y: 81, width: 44, height: 48, rx: 1.25, ry: .9 },
-  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-a", x: 7, y: 72, width: 60, height: 60, rx: 2, ry: 1.3 },
-  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-b", x: 48, y: 84, width: 60, height: 60, rx: 2, ry: 1.3 },
-  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-a", x: 22, y: 52, width: 86, height: 58, rx: 3.2, ry: 1 },
-  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-b", x: 84, y: 52, width: 86, height: 58, rx: 3.2, ry: 1 },
-  { row: 1, col: 3, label: "Overturned shopping cart", className: "decor-cart", x: 72, y: 72, width: 72, height: 58, rx: 2.5, ry: 1.2 },
-  { row: 2, col: 0, label: "Damaged traffic signal", className: "decor-signal", x: 46, y: 52, width: 66, height: 82, rx: 1.7, ry: 1.15 },
-  { row: 2, col: 1, label: "Stacked sandbags", className: "decor-sandbags", x: 57, y: 83, width: 82, height: 56, rx: 3, ry: 1.1 },
-  { row: 2, col: 2, label: "Leaning utility pole", className: "decor-pole", x: 68, y: 54, width: 64, height: 112, rx: 1.45, ry: 1.05 },
-  { row: 2, col: 3, label: "Broken municipal sign", className: "decor-sign", x: 18, y: 79, width: 54, height: 68, rx: 1.35, ry: .9 },
+  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-a", x: 42, y: 54, width: 52, height: 64, rx: 1.25, ry: 1 },
+  { row: 0, col: 0, label: "Rusted fire hydrant", className: "decor-hydrant-b", x: 62, y: 82, width: 52, height: 64, rx: 1.25, ry: 1 },
+  { row: 0, col: 1, label: "Abandoned payphone", className: "decor-payphone", x: 3, y: 53, width: 92, height: 128, rx: 2.1, ry: 1.4 },
+  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-a", x: 65, y: 53, width: 66, height: 80, rx: 1.6, ry: 1.1 },
+  { row: 0, col: 2, label: "Dented postal mailbox", className: "decor-mailbox-b", x: 94, y: 81, width: 66, height: 80, rx: 1.6, ry: 1.1 },
+  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-a", x: 13, y: 52, width: 116, height: 104, rx: 2.6, ry: 1.55 },
+  { row: 0, col: 3, label: "Overflowing trash cans", className: "decor-trash-b", x: 87, y: 72, width: 112, height: 100, rx: 2.5, ry: 1.5 },
+  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-a", x: 34, y: 52, width: 72, height: 88, rx: 1.55, ry: 1 },
+  { row: 1, col: 0, label: "Abandoned newspaper box", className: "decor-news-b", x: 77, y: 81, width: 72, height: 88, rx: 1.55, ry: 1 },
+  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-a", x: 7, y: 72, width: 132, height: 122, rx: 3.3, ry: 1.75 },
+  { row: 1, col: 1, label: "Rusted oil drums", className: "decor-barrels-b", x: 48, y: 84, width: 128, height: 118, rx: 3.2, ry: 1.7 },
+  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-a", x: 22, y: 52, width: 142, height: 104, rx: 4, ry: 1.25 },
+  { row: 1, col: 2, label: "Broken park bench", className: "decor-bench-b", x: 84, y: 52, width: 136, height: 100, rx: 3.8, ry: 1.2 },
+  { row: 1, col: 3, label: "Overturned shopping cart", className: "decor-cart", x: 72, y: 72, width: 122, height: 100, rx: 3.2, ry: 1.45 },
+  { row: 2, col: 0, label: "Damaged traffic signal", className: "decor-signal", x: 46, y: 52, width: 112, height: 140, rx: 2.1, ry: 1.35 },
+  { row: 2, col: 1, label: "Stacked sandbags", className: "decor-sandbags", x: 57, y: 83, width: 150, height: 108, rx: 4.1, ry: 1.45 },
+  { row: 2, col: 2, label: "Leaning utility pole", className: "decor-pole", x: 68, y: 54, width: 122, height: 174, rx: 1.85, ry: 1.25 },
+  { row: 2, col: 3, label: "Broken municipal sign", className: "decor-sign", x: 18, y: 79, width: 88, height: 114, rx: 1.7, ry: 1.05 },
 ];
 
 fixedCollisionZones.push(...cityDecor.map((decor): CollisionZone => ({ kind: "ellipse", x: decor.x, y: decor.y, rx: decor.rx, ry: decor.ry, label: decor.label })));
@@ -379,6 +379,7 @@ export default function Home() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [reels, setReels] = useState(["♠", "7", "★"]);
   const [slotLabel, setSlotLabel] = useState("FATE AWAITS");
+  const [jackpotBurst, setJackpotBurst] = useState(false);
   const [playerPosition, setPlayerPosition] = useState({ x: 51, y: 71 });
   const [destination, setDestination] = useState({ x: 51, y: 71 });
   const [walking, setWalking] = useState(false);
@@ -422,6 +423,7 @@ export default function Home() {
   const movementToken = useRef(0);
   const enemyPatrolIndex = useRef(0);
   const enemyStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jackpotTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceQueue = useRef<Promise<void>>(Promise.resolve());
   const activeAudio = useRef<HTMLAudioElement | null>(null);
 
@@ -507,6 +509,7 @@ export default function Home() {
     movementToken.current += 1;
     if (walkTimer.current) clearTimeout(walkTimer.current);
     if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
+    if (jackpotTimer.current) clearTimeout(jackpotTimer.current);
   }, []);
 
   const xpGoal = level * 100;
@@ -683,8 +686,11 @@ export default function Home() {
     setReels(finalSymbols);
     setSlotLabel(jackpot ? "JACKPOT" : lucky ? "LUCK TURNS" : `ROLL ${roll}`);
     setIsSpinning(false);
-    audio.play(jackpot || lucky ? "slotWin" : "slotLose");
+    audio.play(jackpot ? "slotJackpot" : lucky ? "slotWin" : "slotLose");
     if (jackpot) {
+      setJackpotBurst(true);
+      if (jackpotTimer.current) clearTimeout(jackpotTimer.current);
+      jackpotTimer.current = setTimeout(() => setJackpotBurst(false), 2600);
       setChips((v) => v + 25);
       addLog("JACKPOT · Fate pays 25 old-world chips.", "good");
     }
@@ -818,11 +824,11 @@ export default function Home() {
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices().filter((voice) => /^en[-_]/i.test(voice.lang));
     const preferred = character === "rowan"
-      ? voices.find((voice) => /zira|samantha|aria|female|natural/i.test(voice.name)) || voices[1] || voices[0]
-      : voices.find((voice) => /david|guy|male|mark/i.test(voice.name)) || voices[0];
+      ? voices.find((voice) => /zira|samantha|aria|jenny|female|woman|natural/i.test(voice.name)) || voices.find((voice) => /natural|neural/i.test(voice.name)) || voices[1] || voices[0]
+      : voices.find((voice) => /david|guy|christopher|male|man|mark/i.test(voice.name)) || voices.find((voice) => /natural|neural/i.test(voice.name)) || voices[0];
     if (preferred) utterance.voice = preferred;
-    utterance.rate = character === "rowan" ? .88 : .98;
-    utterance.pitch = character === "rowan" ? .82 : 1.02;
+    utterance.rate = character === "rowan" ? .9 : .96;
+    utterance.pitch = character === "rowan" ? .88 : .78;
     utterance.onend = () => resolve();
     utterance.onerror = () => resolve();
     window.speechSynthesis.speak(utterance);
@@ -1241,7 +1247,8 @@ export default function Home() {
 
       <footer className="fate-bar">
         <div className="fate-copy"><small>THE HOUSE ALWAYS LISTENS</small><strong>FATE ENGINE</strong><p>Every bullet, bargain, and bad idea is a wager.</p></div>
-        <div className={`slot-machine ${isSpinning ? "spinning" : ""}`}>
+        <div className={`slot-machine ${isSpinning ? "spinning" : ""} ${jackpotBurst ? "jackpot" : ""}`}>
+          {jackpotBurst && <div className="jackpot-burst" role="status" aria-live="assertive"><strong>777</strong><span>JACKPOT</span><em>+25 CHIPS</em>{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ "--coin": index } as CSSProperties} />)}</div>}
           <div className="slot-cap"><span>{slotLabel}</span><b>LUCK {luck}</b></div>
           <div className="reels">{reels.map((reel, i) => <div key={i}><span>{reel}</span></div>)}</div>
           <button onClick={() => spinFate("Tempt fate")} disabled={isSpinning}>PULL</button>
@@ -1431,7 +1438,7 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
   }, [conversation, busy]);
   return <div className="dialogue-view">
     <aside className="npc-dossier">
-      <div className="npc-portrait"><Sprite row={2} col={0} label="Rowan portrait" /></div>
+      <div className="npc-portrait"><Sprite row={2} col={0} label="Head-and-shoulders portrait of Rowan Vale" /></div>
       <small>LONE WANDERER</small><h2>ROWAN VALE</h2><p className="mood">MOOD · {npc.mood}</p>
       <div className="relation"><span>TRUST <b>{npc.trust}</b></span><i><em style={{ width: `${npc.trust}%` }} /></i></div>
       <div className="relation"><span>RESPECT <b>{npc.respect}</b></span><i><em style={{ width: `${npc.respect}%` }} /></i></div>
@@ -1442,7 +1449,7 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
     </aside>
     <section className="conversation">
       <div className="conversation-head"><div><small>LIVE CHARACTER SIMULATION · {engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}</small><strong>Say anything. Rowan remembers—and acts.</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
-      <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : line.speaker === "WORLD" ? "world-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CORAL" : line.speaker === "WORLD" ? "STATE" : "CEDAR"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Reading your words against memory, motive, and the state of the world…</p></div>}</div>
+      <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : line.speaker === "WORLD" ? "world-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CEDAR · ADULT BARITONE" : line.speaker === "WORLD" ? "STATE" : "MARIN · ADULT CONTRALTO"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Reading your words against memory, motive, and the state of the world…</p></div>}</div>
       <div className="dialogue-compose"><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder="Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action." maxLength={500} /><button onClick={speak} disabled={busy || !input.trim()}>{busy ? "CALCULATING…" : "SAY IT"}</button><small>Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions.</small></div>
     </section>
   </div>;
