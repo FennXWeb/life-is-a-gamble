@@ -1,0 +1,7 @@
+#!/bin/sh
+# Mirror every future local commit to the GitHub testing branch.
+if git remote get-url github >/dev/null 2>&1; then
+  echo "Syncing commit to GitHub testing..."
+  git push github HEAD:testing || echo "Testing sync deferred: push failed. Run: git push github HEAD:testing"
+fi
+exit 0

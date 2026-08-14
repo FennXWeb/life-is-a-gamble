@@ -1,0 +1,48 @@
+name: Build launcher channels
+
+on:
+  push:
+    branches: [main, testing]
+    paths:
+      - "launcher/**"
+      - ".github/workflows/launcher-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-launcher:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: launcher
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: launcher/package-lock.json
+      - run: npm ci
+      - name: Set channel version
+        shell: pwsh
+        run: |
+          $channel = if ("${{ github.ref_name }}" -eq "testing") { "testing" } else { "latest" }
+          $version = if ($channel -eq "testing") { "1.0.${{ github.run_number }}-testing.0" } else { "1.0.${{ github.run_number }}" }
+          npm version $version --no-git-tag-version
+          npm pkg set build.publish.channel=$channel
+          "RELEASE_CHANNEL=$channel" >> $env:GITHUB_ENV
+      - name: Publish installer and differential metadata
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EP_PRE_RELEASE: ${{ github.ref_name == 'testing' }}
+          EP_DRAFT: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: life-is-a-gamble-${{ github.ref_name }}-installer
+          path: |
+            launcher/release/*.exe
+            launcher/release/*.blockmap
+            launcher/release/*.yml

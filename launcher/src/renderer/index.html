@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Life is a Gamble Launcher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="launcher-shell">
+    <header class="topbar">
+      <div class="brand"><small>FENNX // FIELD TERMINAL</small><h1>LIFE <i>IS A</i> GAMBLE</h1></div>
+      <div class="connection"><span class="lamp"></span><div><small>PATCH NETWORK</small><strong id="network-status">CONNECTED</strong></div></div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <small>UPSTATE NEW YORK · 2186</small>
+        <h2>THE HOUSE<br>ALWAYS LISTENS.</h2>
+        <p>Continue into the ruins of Syracuse. Your saves, release channel, and field updates are managed here.</p>
+      </div>
+      <div class="syracuse-map" aria-hidden="true"><i></i><i></i><i></i><b>SYRACUSE</b><span>43.0481° N<br>76.1474° W</span></div>
+    </section>
+
+    <section class="control-deck">
+      <article class="update-card">
+        <header><div><small>INSTALLATION STATUS</small><strong id="update-message">Ready to play</strong></div><button id="check-update">CHECK</button></header>
+        <div class="progress-track"><i id="progress-bar"></i></div>
+        <div class="update-meta"><span id="progress-label">0%</span><span>LAUNCHER <b id="app-version">—</b></span></div>
+      </article>
+
+      <article class="channel-card">
+        <small>RELEASE BRANCH</small>
+        <label for="release-channel">Update channel</label>
+        <select id="release-channel"><option value="main">MAIN · STABLE</option><option value="testing">TESTING · PRERELEASE</option></select>
+        <p id="channel-note">Stable public builds from the main branch.</p>
+        <button id="open-repo">VIEW REPOSITORY</button>
+      </article>
+
+      <article class="save-card">
+        <header><div><small>COURIER ARCHIVE</small><strong>SAVE BACKUPS</strong></div><button id="open-saves">OPEN FOLDER</button></header>
+        <div class="save-actions"><input id="backup-name" maxlength="60" placeholder="Backup name"><button id="create-backup">BACK UP ACTIVE SAVE</button><button id="reset-save" class="danger">RESET ACTIVE</button></div>
+        <div id="save-list" class="save-list"><p class="empty">No save backups yet.</p></div>
+      </article>
+
+      <article class="launch-card">
+        <div><small>ACTIVE INSTALLATION</small><strong>SYRACUSE BUILD</strong><span id="launch-status">READY</span></div>
+        <button id="apply-update" hidden>RESTART & APPLY</button>
+        <button id="launch-game">LAUNCH GAME <b>▶</b></button>
+      </article>
+    </section>
+    <footer><span>BUILD CHANNEL <b id="footer-channel">MAIN</b></span><span>Save data remains on this device.</span><span>© 2026 FENNXWEB</span></footer>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

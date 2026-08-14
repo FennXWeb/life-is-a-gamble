@@ -1,100 +1,86 @@
-# vinext-starter
+# Life is a Gamble
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+## LIAG Editor
 
-## Prerequisites
+The admin-only editor is mounted at `/editor`. It provides structured builders
+for levels, positioned cells and doors, loot tables, custom NPCs, hostile NPC
+spawners, and quests. Its Files workspace can inspect the repository tree and
+edit text source files.
 
-- Node.js `>=22.13.0`
+All writes happen server-side through the GitHub Contents API and are committed
+to the configured `testing` branch. Configure `LIAG_EDITOR_ADMIN_EMAILS`,
+`LIAG_GITHUB_REPOSITORY`, and `LIAG_GITHUB_TOKEN` in the hosted runtime. The
+token should be fine-grained and limited to Contents read/write access for this
+repository. `LIAG_GITHUB_BRANCH` defaults to `testing`; the canonical project
+document defaults to `game-data/editor-project.json`.
 
-## Quick Start
+For local development only, set `LIAG_EDITOR_DEV_EMAIL` to an address that is
+also included in `LIAG_EDITOR_ADMIN_EMAILS`.
 
-```bash
+An original isometric post-apocalyptic CRPG set in the ruins of Upstate New York, one hundred years after the collapse of the United States government.
+
+The current playable district is downtown Syracuse. It includes click-to-walk exploration, collision-aware streets, turn-based combat, dynamic AI dialogue, persistent NPC state, grid inventory and equipment, skill progression, Fate slot-machine checks, adaptive music playlists, and a Windows launcher.
+
+## Branches
+
+- `main` — stable release source.
+- `testing` — automatic integration branch for future work and prerelease launcher builds.
+
+GitHub permissions apply to the repository as a whole. The testing branch is readable wherever the repository is readable; write access is limited to repository collaborators and branch rules.
+
+## Web game
+
+Requirements: Node.js 22.13 or newer.
+
+```powershell
 npm install
 npm run dev
+```
+
+Production validation:
+
+```powershell
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+The folder-driven soundtrack lives under `public/music`. Development and production builds regenerate its playlist manifest automatically.
 
-## Included Shape
+## Windows launcher and installer
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+The launcher opens the hosted game in a persistent game window and provides:
 
-## Workspace Auth Headers
+- local save backup, restore, deletion, and reset;
+- stable (`main`) and prerelease (`testing`) update channels;
+- automatic update checks and background downloads;
+- differential NSIS updates using blockmap metadata;
+- an update progress bar and disabled Launch button while patching;
+- restart-and-apply behavior after an update is downloaded.
 
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
+Build the installer:
 
-The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```powershell
+cd launcher
+npm install
+npm run check
+npm run dist
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+The installer is written to `launcher/release`.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## Automatic testing sync
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+Run once in a fresh clone:
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+```powershell
+.\scripts\install-git-hooks.ps1
+```
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+After installation, every local commit is mirrored to the GitHub `testing` branch. Failed offline pushes do not discard the local commit and can be retried with `git push github HEAD:testing`.
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## Saves
 
-## Useful Commands
+The web game stores its active save locally. The launcher keeps timestamped backup files in the Electron user-data directory and never deletes backups when the active save is reset.
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+## Rights
 
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Copyright © 2026 FennXWeb. All rights reserved. No license is granted for redistribution or derivative works.

@@ -1,8 +1,18 @@
 {
   "tracks": {
-    "menu": [],
-    "ambient": [],
-    "combat": [],
+    "menu": [
+      "/music/menu/Only%20After%20Dark.wav"
+    ],
+    "ambient": [
+      "/music/ambient/Apocalypse.wav",
+      "/music/ambient/Wanderer.wav",
+      "/music/ambient/Wind%20Willows.wav"
+    ],
+    "combat": [
+      "/music/combat/Fallout%20Combat.wav",
+      "/music/combat/Lone%20Wanderer.wav",
+      "/music/combat/Vault%20of%20Dreams.wav"
+    ],
     "dialogue": [],
     "interior": []
   }

@@ -1,0 +1,59 @@
+{
+  "name": "life-is-a-gamble-launcher",
+  "version": "1.0.0",
+  "description": "Windows launcher and updater for Life is a Gamble",
+  "main": "src/main.cjs",
+  "author": "FennXWeb",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/renderer/renderer.js",
+    "dist": "electron-builder --win nsis --publish never",
+    "release": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.6.2"
+  },
+  "devDependencies": {
+    "electron": "40.4.0",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "org.fennx.lifeisagamble.launcher",
+    "productName": "Life is a Gamble",
+    "artifactName": "Life-is-a-Gamble-Setup-${version}.${ext}",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Life is a Gamble"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "FennXWeb",
+      "repo": "life-is-a-gamble",
+      "releaseType": "release",
+      "channel": "latest"
+    }
+  }
+}
