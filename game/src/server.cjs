@@ -105,6 +105,13 @@ async function createGameServer(runtimeRoot) {
   const server = http.createServer(async (request, response) => {
     try {
       const webRequest = await toWebRequest(request, origin);
+      if (webRequest.method === "GET" || webRequest.method === "HEAD") {
+        const assetResponse = await createAssetResponse(clientRoot, webRequest);
+        if (assetResponse.status !== 404) {
+          await sendWebResponse(assetResponse, response);
+          return;
+        }
+      }
       await sendWebResponse(await worker.fetch(webRequest, environment, executionContext), response);
     } catch (error) {
       console.error("Game request failed", error);

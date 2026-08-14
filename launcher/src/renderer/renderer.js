@@ -31,7 +31,7 @@ function renderUpdate(update) {
 function renderChannel(channel) {
   elements.channel.value = channel;
   elements.footerChannel.textContent = channel.toUpperCase();
-  elements.channelNote.textContent = channel === "testing" ? "Prerelease builds from the protected testing branch." : "Stable public builds from the main branch.";
+  elements.channelNote.textContent = channel === "testing" ? "Early builds intended for testing and feedback." : "Stable builds selected for general play.";
 }
 
 function renderSaves(saves) {
@@ -64,7 +64,6 @@ elements.launch.addEventListener("click", async () => { const result = await win
 elements.check.addEventListener("click", () => window.launcher.checkUpdates().catch((error) => toast(error.message)));
 elements.apply.addEventListener("click", () => window.launcher.installUpdate());
 elements.channel.addEventListener("change", async () => { try { const result = await window.launcher.setChannel(elements.channel.value); renderChannel(result.channel); } catch (error) { toast(error.message); } });
-document.querySelector("#open-repo").addEventListener("click", () => window.launcher.openRepository());
 document.querySelector("#open-saves").addEventListener("click", () => window.launcher.openSaveFolder());
 document.querySelector("#create-backup").addEventListener("click", async () => { try { renderSaves(await window.launcher.createBackup(elements.backupName.value)); elements.backupName.value = ""; toast("Active save backed up."); } catch (error) { toast(error.message); } });
 document.querySelector("#reset-save").addEventListener("click", async () => { try { await window.launcher.resetActiveSave(); toast("Active save reset. Backups were preserved."); } catch (error) { toast(error.message); } });

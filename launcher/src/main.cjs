@@ -4,7 +4,6 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-const REPOSITORY_URL = "https://github.com/FennXWeb/life-is-a-gamble";
 const CHANNELS = new Set(["main", "testing"]);
 
 let launcherWindow = null;
@@ -78,7 +77,14 @@ function wireUpdaterEvents() {
   autoUpdater.on("update-not-available", () => sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Game is up to date" }));
   autoUpdater.on("download-progress", (progress) => sendUpdateState({ phase: "downloading", busy: true, percent: Math.max(0, Math.min(100, progress.percent || 0)), message: `Patching in background · ${Math.round(progress.percent || 0)}%` }));
   autoUpdater.on("update-downloaded", (info) => sendUpdateState({ phase: "downloaded", busy: true, percent: 100, message: `${info.version} ready · restart to apply` }));
-  autoUpdater.on("error", (error) => sendUpdateState({ phase: "error", busy: false, percent: 0, message: error?.message || "Update check failed" }));
+  autoUpdater.on("error", (error) => {
+    const message = String(error?.message || "");
+    if (/no published versions/i.test(message)) {
+      sendUpdateState({ phase: "ready", busy: false, percent: 100, message: "Installed build is ready · no newer channel build" });
+      return;
+    }
+    sendUpdateState({ phase: "error", busy: false, percent: 0, message: message || "Update service unavailable" });
+  });
 }
 
 async function checkForUpdates() {
@@ -160,7 +166,9 @@ ipcMain.handle("launcher:launch-game", async () => {
   if (updateState.busy) return { ok: false, error: "Finish the update before launching." };
   try {
     await launchGame();
-    return { ok: true };
+    launcherWindow?.hide();
+    setTimeout(() => app.quit(), 250);
+    return { ok: true, closing: true };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -176,7 +184,6 @@ ipcMain.handle("launcher:set-channel", async (_event, channel) => {
 });
 ipcMain.handle("launcher:check-updates", () => checkForUpdates());
 ipcMain.handle("launcher:install-update", () => { if (updateState.phase === "downloaded") autoUpdater.quitAndInstall(false, true); });
-ipcMain.handle("launcher:open-repository", () => shell.openExternal(REPOSITORY_URL));
 ipcMain.handle("saves:create", async (_event, requestedName) => {
   const raw = await readActiveSave();
   if (!raw) throw new Error("No active game save exists yet.");
