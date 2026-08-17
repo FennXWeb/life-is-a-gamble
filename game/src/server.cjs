@@ -80,7 +80,10 @@ async function sendWebResponse(response, target) {
   target.end(body);
 }
 
-async function createGameServer(runtimeRoot) {
+async function createGameServer(runtimeRoot, runtimeEnvironment = {}) {
+  for (const name of ["OPENAI_API_KEY", "OPENAI_DIALOGUE_MODEL", "OPENAI_TTS_MODEL", "OPENAI_STT_MODEL"]) {
+    if (typeof runtimeEnvironment[name] === "string" && runtimeEnvironment[name]) process.env[name] = runtimeEnvironment[name];
+  }
   const serverEntry = path.join(runtimeRoot, "server", "index.js");
   const clientRoot = path.join(runtimeRoot, "client");
   const moduleUrl = `${pathToFileURL(serverEntry).href}?desktop=${Date.now()}`;
@@ -99,6 +102,10 @@ async function createGameServer(runtimeRoot) {
   const environment = {
     ASSETS: { fetch: (request) => createAssetResponse(clientRoot, request) },
     DESKTOP_RUNTIME: "windows",
+    OPENAI_API_KEY: runtimeEnvironment.OPENAI_API_KEY || "",
+    OPENAI_DIALOGUE_MODEL: runtimeEnvironment.OPENAI_DIALOGUE_MODEL || "",
+    OPENAI_TTS_MODEL: runtimeEnvironment.OPENAI_TTS_MODEL || "",
+    OPENAI_STT_MODEL: runtimeEnvironment.OPENAI_STT_MODEL || "",
   };
 
   let origin = "http://127.0.0.1";

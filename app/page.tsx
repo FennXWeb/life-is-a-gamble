@@ -2086,13 +2086,35 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
   const recognitionRef = useRef<SpeechRecognitionController | null>(null);
   const speakRef = useRef(speak);
   const submittedSpeech = useRef(false);
-  const [micState, setMicState] = useState<"off" | "ready" | "listening" | "processing" | "denied" | "unsupported">("off");
+  const restartTimerRef = useRef<number | null>(null);
+  const [micCycle, setMicCycle] = useState(0);
+  const [forceRecorder, setForceRecorder] = useState(false);
+  const [micState, setMicState] = useState<"off" | "ready" | "permission" | "listening" | "hearing" | "transcribing" | "processing" | "denied" | "unsupported" | "error">("off");
   useEffect(() => { speakRef.current = speak; }, [speak]);
   useEffect(() => {
     const box = transcriptRef.current;
     if (box) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
   }, [conversation, busy]);
   useEffect(() => {
+    let disposed = false;
+    let mediaStream: MediaStream | null = null;
+    let recorder: MediaRecorder | null = null;
+    let audioContext: AudioContext | null = null;
+    let animationFrame = 0;
+    let maximumTimer = 0;
+    const queueRestart = (delay = 450) => {
+      if (disposed) return;
+      if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = window.setTimeout(() => setMicCycle((cycle) => cycle + 1), delay);
+    };
+    const cleanMedia = () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (maximumTimer) window.clearTimeout(maximumTimer);
+      mediaStream?.getTracks().forEach((track) => track.stop());
+      mediaStream = null;
+      if (audioContext && audioContext.state !== "closed") void audioContext.close();
+      audioContext = null;
+    };
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     submittedSpeech.current = false;
@@ -2103,43 +2125,124 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
       webkitSpeechRecognition?: new () => SpeechRecognitionController;
     };
     const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!Recognition) { setMicState("unsupported"); return; }
-    const recognition = new Recognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognition.onstart = () => setMicState("listening");
-    recognition.onresult = (event) => {
-      let transcript = "";
-      let final = false;
-      for (let index = event.resultIndex; index < event.results.length; index++) {
-        transcript += event.results[index][0]?.transcript || "";
-        final = final || event.results[index].isFinal;
+    const canRecord = Boolean(navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined");
+    const finishTranscript = (clean: string) => {
+      if (!clean || submittedSpeech.current || disposed) return;
+      submittedSpeech.current = true;
+      setInput(clean);
+      setMicState("processing");
+      window.setTimeout(() => speakRef.current(clean), 80);
+    };
+    const startRecorder = async () => {
+      if (!canRecord) { setMicState("unsupported"); return; }
+      setMicState("permission");
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      } catch (error) {
+        if (!disposed) setMicState(error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError") ? "denied" : "error");
+        return;
       }
-      const clean = transcript.trim();
-      if (clean) setInput(clean);
-      if (final && clean && !submittedSpeech.current) {
-        submittedSpeech.current = true;
-        setMicState("processing");
-        recognition.stop();
-        window.setTimeout(() => speakRef.current(clean), 80);
+      if (disposed || !mediaStream) { cleanMedia(); return; }
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"].find((type) => MediaRecorder.isTypeSupported(type));
+      const chunks: Blob[] = [];
+      let heardSpeech = false;
+      let lastVoiceAt = performance.now();
+      const startedAt = lastVoiceAt;
+      recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.onerror = () => { if (!disposed) setMicState("error"); cleanMedia(); };
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: recorder?.mimeType || mimeType || "audio/webm" });
+        cleanMedia();
+        if (disposed) return;
+        if (!heardSpeech || blob.size < 800) { setMicState("ready"); queueRestart(); return; }
+        setMicState("transcribing");
+        try {
+          const form = new FormData();
+          form.append("audio", blob, blob.type.includes("ogg") ? "dialogue.ogg" : "dialogue.webm");
+          const response = await fetch("/api/transcribe", { method: "POST", body: form });
+          const result = await response.json() as { text?: string; error?: string };
+          if (!response.ok || !result.text?.trim()) throw new Error(result.error || "No speech detected");
+          finishTranscript(result.text.trim().slice(0, 500));
+        } catch (error) {
+          console.error("Live transcription failed", error);
+          if (!disposed) { setMicState("error"); queueRestart(1400); }
+        }
+      };
+      recorder.start(250);
+      setMicState("listening");
+
+      audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(mediaStream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = .4;
+      source.connect(analyser);
+      const samples = new Uint8Array(analyser.fftSize);
+      const monitor = () => {
+        if (disposed || !recorder || recorder.state !== "recording") return;
+        analyser.getByteTimeDomainData(samples);
+        let energy = 0;
+        for (const sample of samples) { const centered = (sample - 128) / 128; energy += centered * centered; }
+        const volume = Math.sqrt(energy / samples.length);
+        const now = performance.now();
+        if (volume > .022) {
+          heardSpeech = true;
+          lastVoiceAt = now;
+          setMicState((state) => state === "hearing" ? state : "hearing");
+        } else if (heardSpeech) {
+          setMicState((state) => state === "listening" ? state : "listening");
+        }
+        if (heardSpeech && now - lastVoiceAt > 950 && now - startedAt > 1100) recorder.stop();
+        else animationFrame = requestAnimationFrame(monitor);
       }
+      animationFrame = requestAnimationFrame(monitor);
+      maximumTimer = window.setTimeout(() => { if (recorder?.state === "recording") recorder.stop(); }, 15000);
     };
-    recognition.onerror = (event) => {
-      setMicState(event.error === "not-allowed" || event.error === "service-not-allowed" ? "denied" : "ready");
+    const startBrowserRecognition = () => {
+      if (!Recognition) { void startRecorder(); return; }
+      const recognition = new Recognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onstart = () => setMicState("listening");
+      recognition.onresult = (event) => {
+        let transcript = "";
+        let final = false;
+        for (let index = event.resultIndex; index < event.results.length; index++) {
+          transcript += event.results[index][0]?.transcript || "";
+          final = final || event.results[index].isFinal;
+        }
+        const clean = transcript.trim();
+        if (clean) setInput(clean);
+        if (final && clean) { recognition.stop(); finishTranscript(clean); }
+      };
+      recognition.onerror = (event) => {
+        recognitionRef.current = null;
+        if (event.error === "not-allowed") setMicState("denied");
+        else if (canRecord) setForceRecorder(true);
+        else { setMicState("error"); queueRestart(1200); }
+      };
+      recognition.onend = () => {
+        recognitionRef.current = null;
+        if (!submittedSpeech.current && !disposed) { setMicState("ready"); queueRestart(); }
+      };
+      recognitionRef.current = recognition;
+      try { recognition.start(); } catch { if (canRecord) setForceRecorder(true); else setMicState("error"); }
     };
-    recognition.onend = () => {
-      recognitionRef.current = null;
-      if (!submittedSpeech.current) setMicState("ready");
-    };
-    recognitionRef.current = recognition;
-    try { recognition.start(); } catch { setMicState("ready"); }
+    const nativeGame = /Electron\//i.test(navigator.userAgent);
+    if (forceRecorder || nativeGame || !Recognition) void startRecorder();
+    else startBrowserRecognition();
     return () => {
-      recognition.onend = null;
-      recognition.stop();
-      if (recognitionRef.current === recognition) recognitionRef.current = null;
+      disposed = true;
+      if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+      const recognition = recognitionRef.current;
+      if (recognition) { recognition.onend = null; recognition.stop(); recognitionRef.current = null; }
+      if (recorder?.state === "recording") recorder.stop();
+      cleanMedia();
     };
-  }, [liveConversation, busy, speakingCharacter, combatActive, setInput]);
+  }, [liveConversation, busy, speakingCharacter, combatActive, setInput, forceRecorder, micCycle]);
   return <div className="dialogue-view">
     <aside className="npc-dossier">
       <div className="npc-portrait"><Sprite row={2} col={0} label="Head-and-shoulders portrait of Rowan Vale" /></div>

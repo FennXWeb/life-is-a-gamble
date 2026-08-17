@@ -1,4 +1,5 @@
-const { app, BrowserWindow, dialog, shell } = require("electron");
+const { app, BrowserWindow, dialog, session, shell } = require("electron");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { createGameServer } = require("./server.cjs");
@@ -16,6 +17,19 @@ const saveSlotsPath = () => path.join(sharedRoot(), "saves", "save-slots.json");
 const runtimeRoot = () => app.isPackaged
   ? path.join(process.resourcesPath, "game-dist")
   : path.resolve(__dirname, "..", "..", "dist");
+
+function readWindowsUserEnvironment(name) {
+  if (process.platform !== "win32") return undefined;
+  try {
+    const output = execFileSync("reg.exe", ["query", "HKCU\\Environment", "/v", name], { encoding: "utf8", windowsHide: true });
+    const line = output.split(/\r?\n/).find((candidate) => candidate.includes(name) && /REG_(?:EXPAND_)?SZ/.test(candidate));
+    return line?.match(/REG_(?:EXPAND_)?SZ\s+(.+)$/)?.[1]?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const runtimeEnvironmentValue = (name) => process.env[name] || readWindowsUserEnvironment(name);
 
 async function readSaveFile(filePath) {
   try {
@@ -77,6 +91,14 @@ async function applyNativeSaves() {
 }
 
 function createGameWindow(origin) {
+  const isGameOrigin = (requestingOrigin) => {
+    try { return new URL(requestingOrigin).origin === origin; } catch { return false; }
+  };
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => permission === "media" && isGameOrigin(requestingOrigin));
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    const wantsAudio = !details.mediaTypes?.length || details.mediaTypes.includes("audio");
+    callback(permission === "media" && wantsAudio && isGameOrigin(details.requestingUrl));
+  });
   gameWindow = new BrowserWindow({
     width: 1600,
     height: 960,
@@ -131,7 +153,12 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   try {
-    gameServer = await createGameServer(runtimeRoot());
+    gameServer = await createGameServer(runtimeRoot(), {
+      OPENAI_API_KEY: runtimeEnvironmentValue("OPENAI_API_KEY"),
+      OPENAI_DIALOGUE_MODEL: runtimeEnvironmentValue("OPENAI_DIALOGUE_MODEL"),
+      OPENAI_TTS_MODEL: runtimeEnvironmentValue("OPENAI_TTS_MODEL"),
+      OPENAI_STT_MODEL: runtimeEnvironmentValue("OPENAI_STT_MODEL"),
+    });
     createGameWindow(gameServer.origin);
     saveTimer = setInterval(() => {
       void persistNativeSaves().catch((error) => console.error("Native save mirror failed", error));

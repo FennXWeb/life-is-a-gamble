@@ -96,9 +96,10 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
 });
 
 test("dead characters leave persistent lootable corpses and live dialogue uses the default microphone", async () => {
-  const [page, css] = await Promise.all([
+  const [page, css, transcription] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/transcribe/route.ts", import.meta.url), "utf8"),
   ]);
   await access(new URL("../public/character-corpse-atlas.png", import.meta.url));
   assert.match(page, /const corpseLoot/);
@@ -107,8 +108,14 @@ test("dead characters leave persistent lootable corpses and live dialogue uses t
   assert.match(page, /lootCorpse/);
   assert.match(page, /SpeechRecognition/);
   assert.match(page, /webkitSpeechRecognition/);
+  assert.match(page, /navigator\.mediaDevices\.getUserMedia/);
+  assert.match(page, /new MediaRecorder/);
+  assert.match(page, /fetch\("\/api\/transcribe"/);
+  assert.match(page, /volume > \.022/);
   assert.match(page, /life-is-a-gamble-live-conversation/);
   assert.match(page, /speakRef\.current\(clean\)/);
+  assert.match(transcription, /gpt-4o-mini-transcribe/);
+  assert.match(transcription, /\/v1\/audio\/transcriptions/);
   assert.match(css, /character-corpse-atlas\.png/);
   assert.match(css, /\.live-toggle/);
 });
