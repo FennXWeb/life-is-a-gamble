@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./editor.module.css";
+import { LevelBuilder } from "./level-builder";
 import type { GameProject, Level, LootEntry, LootTable, MountInfo, Npc, NpcSpawner, ProjectResponse, Quest, SpawnEntry, WorldCell } from "./project-types";
 
 type Tab = "world" | "loot" | "npcs" | "spawners" | "quests" | "files";
@@ -120,7 +121,7 @@ export function EditorShell({ user }: { user: { name: string; email: string } })
       {notice && <div className={`${styles.notice} ${styles[notice.tone]}`}><span>{notice.tone === "ok" ? "✓" : "!"}</span>{notice.text}<button onClick={() => setNotice(null)}>×</button></div>}
       {loading && <div className={styles.loading}><i /><h2>Mounting testing branch</h2><p>Reading the current game-data document…</p></div>}
       {!loading && !project && <Empty title="Project unavailable" text="LIAG Editor could not open its game-data document." addLabel="Try again" onAdd={() => void loadProject()} />}
-      {!loading && project && tab === "world" && <WorldEditor project={project} edit={edit} />}
+      {!loading && project && tab === "world" && <LevelBuilder project={project} edit={edit} setNotice={setNotice} />}
       {!loading && project && tab === "loot" && <LootEditor project={project} edit={edit} />}
       {!loading && project && tab === "npcs" && <NpcEditor project={project} edit={edit} />}
       {!loading && project && tab === "spawners" && <SpawnerEditor project={project} edit={edit} />}
@@ -130,7 +131,7 @@ export function EditorShell({ user }: { user: { name: string; email: string } })
   </main>;
 }
 
-function WorldEditor({ project, edit }: { project: GameProject; edit: (fn: (draft: GameProject) => void) => void }) {
+export function LegacyWorldEditor({ project, edit }: { project: GameProject; edit: (fn: (draft: GameProject) => void) => void }) {
   const [levelId, setLevelId] = useState(project.levels[0]?.id || "");
   const level = project.levels.find((entry) => entry.id === levelId) || project.levels[0];
   const levelCells = project.cells.filter((cell) => cell.levelId === level?.id);

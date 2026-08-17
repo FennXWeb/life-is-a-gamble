@@ -7,6 +7,57 @@ export type Door = {
   loadMode: "stream" | "transition" | "locked";
   locked: boolean;
   keyId: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+};
+
+export type SpriteAsset = {
+  id: string;
+  name: string;
+  path: string;
+  width: number;
+  height: number;
+  category: "terrain" | "structure" | "prop" | "character" | "effect";
+  tags: string[];
+};
+
+export type LevelLayer = {
+  id: string;
+  levelId: string;
+  name: string;
+  kind: "terrain" | "objects" | "collision" | "entities" | "lighting";
+  visible: boolean;
+  locked: boolean;
+  opacity: number;
+};
+
+export type ObjectCollision = {
+  enabled: boolean;
+  shape: "rectangle" | "circle";
+  solid: boolean;
+  trigger: boolean;
+  tag: string;
+};
+
+export type LevelObject = {
+  id: string;
+  levelId: string;
+  layerId: string;
+  name: string;
+  spriteId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  flipX: boolean;
+  flipY: boolean;
+  tint: string;
+  collision: ObjectCollision;
 };
 
 export type WorldCell = {
@@ -145,6 +196,9 @@ export type GameProject = {
   npcs: Npc[];
   spawners: NpcSpawner[];
   quests: Quest[];
+  spriteAssets: SpriteAsset[];
+  levelLayers: LevelLayer[];
+  levelObjects: LevelObject[];
 };
 
 export type MountInfo = {

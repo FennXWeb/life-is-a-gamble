@@ -90,6 +90,18 @@ export async function readRepositoryFile(config: GitHubMountConfig, path: string
   return { content: decodeBase64Utf8(payload.content), sha: payload.sha, path: payload.path, size: payload.size };
 }
 
+export async function readRepositoryBase64(config: GitHubMountConfig, path: string) {
+  const response = await githubFetch(config, `${contentUrl(config, path)}?ref=${encodeURIComponent(config.branch)}`);
+  const payload = await response.json() as GitHubContent;
+  if (payload.type !== "file" || payload.encoding !== "base64") throw new Error("The selected repository path is not a readable file.");
+  return { content: payload.content.replace(/\s/g, ""), sha: payload.sha, path: payload.path, size: payload.size };
+}
+
+export async function readRepositoryBytes(config: GitHubMountConfig, path: string) {
+  const response = await githubFetch(config, `${contentUrl(config, path)}?ref=${encodeURIComponent(config.branch)}`, { headers: { Accept: "application/vnd.github.raw+json" } });
+  return { bytes: new Uint8Array(await response.arrayBuffer()), etag: response.headers.get("etag") };
+}
+
 export async function writeRepositoryFile(
   config: GitHubMountConfig,
   path: string,
@@ -101,6 +113,26 @@ export async function writeRepositoryFile(
   const body: Record<string, unknown> = {
     message,
     content: encodeBase64Utf8(content),
+    branch: config.branch,
+    committer: author,
+  };
+  if (sha) body.sha = sha;
+  const response = await githubFetch(config, contentUrl(config, path), { method: "PUT", body: JSON.stringify(body) });
+  const payload = await response.json() as { content?: { sha?: string }; commit?: { sha?: string; html_url?: string } };
+  return { sha: payload.content?.sha || null, commitSha: payload.commit?.sha || null, commitUrl: payload.commit?.html_url || null };
+}
+
+export async function writeRepositoryBase64(
+  config: GitHubMountConfig,
+  path: string,
+  base64Content: string,
+  sha: string | null,
+  message: string,
+  author: { name: string; email: string },
+) {
+  const body: Record<string, unknown> = {
+    message,
+    content: base64Content.replace(/\s/g, ""),
     branch: config.branch,
     committer: author,
   };
