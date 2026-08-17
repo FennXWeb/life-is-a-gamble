@@ -89,7 +89,8 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
   assert.match(page, /facade-door-/);
   assert.match(page, /facade=\{\{ kind: "landmark", id: "syracuse-city-hall" \}\}/);
   assert.match(css, /\.building-facade-art\.storefront/);
-  assert.match(css, /\.sign-landmark-theatre/);
+  assert.doesNotMatch(page, /className=\{`building-sign/);
+  assert.match(css, /--facade-width:205px;--facade-height:350px/);
   assert.match(css, /\.streetwall-row \.has-facade \.building-cell \.building-tile/);
   assert.match(css, /\.facade-door-syracuse-city-hall/);
 });

@@ -419,7 +419,7 @@ function ModularBuilding({ className, name, subtitle, material, floors, bays, do
     if (facade) return <div key={index} className="building-cell">{tile}</div>;
     return isDoor && door ? <button key={index} className="building-door-cell" onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}>{tile}</button> : <div key={index} className="building-cell">{tile}</div>;
   });
-  return <section className={`modular-building ${className} ${material}${facade ? ` has-facade facade-kind-${facade.kind} facade-id-${facade.id}` : ""}`} style={{ "--bays": bays, "--floors": floors } as CSSProperties} onClick={(event) => event.stopPropagation()}>
+  return <section className={`modular-building ${className} ${material}${facade ? ` has-facade facade-kind-${facade.kind} facade-id-${facade.id}` : ""}`} style={{ "--bays": bays, "--floors": floors } as CSSProperties} aria-label={`${name} — ${subtitle}`} onClick={(event) => event.stopPropagation()}>
     <div className="building-roof"><BuildingTile row={2} col={2} /></div>
     <div className="building-side">{Array.from({ length: floors }, (_, floor) => <BuildingTile key={floor} row={material === "stone" ? 1 : 0} col={0} />)}</div>
     <div className="building-face">
@@ -428,7 +428,6 @@ function ModularBuilding({ className, name, subtitle, material, floors, bays, do
       {facade && door && <button className={`facade-door-hitbox facade-door-${facade.id}`} onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}><span>ENTRY</span></button>}
     </div>
     <div className="building-cornice"><BuildingTile row={material === "stone" ? 1 : 0} col={3} /></div>
-    <div className={`building-sign sign-${facade?.id ?? "default"}`}><strong>{name}</strong><small>{subtitle}</small></div>
   </section>;
 }
 
