@@ -53,13 +53,17 @@ async function githubFetch(config: GitHubMountConfig, url: string, init?: Reques
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${config.token}`,
       "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "LIAG-Editor",
       "Content-Type": "application/json",
       ...init?.headers,
     },
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { message?: string };
-    const error = new Error(payload.message || `GitHub returned ${response.status}.`) as Error & { status?: number };
+    const body = await response.text();
+    let message = "";
+    try { message = (JSON.parse(body) as { message?: string }).message || ""; }
+    catch { message = body.trim().slice(0, 240); }
+    const error = new Error(message || `GitHub returned ${response.status}.`) as Error & { status?: number };
     error.status = response.status;
     throw error;
   }
