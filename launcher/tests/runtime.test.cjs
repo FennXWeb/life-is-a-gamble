@@ -81,4 +81,6 @@ test("release automation publishes the testing channel only", () => {
   assert.doesNotMatch(workflow, /branches: \[[^\]]*main/);
   assert.match(workflow, /channel-manifest\.json/);
   assert.match(workflow, /PUBLISH_LAUNCHER_BOOTSTRAP/);
+  assert.match(workflow, /gh release list --limit 100 --json tagName/);
+  assert.doesNotMatch(workflow, /gh release view/);
 });

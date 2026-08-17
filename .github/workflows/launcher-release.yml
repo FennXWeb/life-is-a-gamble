@@ -69,8 +69,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view $env:LAUNCHER_TAG *> $null
-          $publish = if ($LASTEXITCODE -eq 0) { "false" } else { "true" }
+          $releaseTags = @(gh release list --limit 100 --json tagName | ConvertFrom-Json | ForEach-Object { $_.tagName })
+          $publish = if ($releaseTags -contains $env:LAUNCHER_TAG) { "false" } else { "true" }
           "PUBLISH_LAUNCHER_BOOTSTRAP=$publish" >> $env:GITHUB_ENV
 
       - name: Publish launcher bootstrap update
@@ -124,8 +124,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view "v0.0.0-testing-channel" *> $null
-          if ($LASTEXITCODE -ne 0) {
+          $releaseTags = @(gh release list --limit 100 --json tagName | ConvertFrom-Json | ForEach-Object { $_.tagName })
+          if ($releaseTags -notcontains "v0.0.0-testing-channel") {
             gh release create "v0.0.0-testing-channel" --prerelease --title "Testing Channel" --notes "Rolling testing-channel payloads. Install through the launcher unless directed otherwise."
           }
           $manifest = "release-assets/channel-manifest.json"
