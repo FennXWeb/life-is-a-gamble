@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Native Windows runtime for Life is a Gamble",
   "main": "src/main.cjs",
-  "author": "FennXWeb",
+  "author": "FennX Creative",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {

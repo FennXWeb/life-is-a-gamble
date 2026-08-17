@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("launcher", {
+  minimizeWindow: () => ipcRenderer.invoke("launcher:minimize"),
+  closeWindow: () => ipcRenderer.invoke("launcher:close"),
   getState: () => ipcRenderer.invoke("launcher:get-state"),
   launchGame: () => ipcRenderer.invoke("launcher:launch-game"),
   setChannel: (channel) => ipcRenderer.invoke("launcher:set-channel", channel),

@@ -86,9 +86,30 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
   await Promise.all(assets.map((asset) => access(new URL(asset, import.meta.url))));
   assert.match(page, /building-facade-art/);
   assert.match(page, /facade-door-hitbox/);
+  assert.match(page, /facade-door-/);
   assert.match(page, /facade=\{\{ kind: "landmark", id: "syracuse-city-hall" \}\}/);
   assert.match(css, /\.building-facade-art\.storefront/);
   assert.match(css, /\.sign-landmark-theatre/);
+  assert.match(css, /\.streetwall-row \.has-facade \.building-cell \.building-tile/);
+  assert.match(css, /\.facade-door-syracuse-city-hall/);
+});
+
+test("dead characters leave persistent lootable corpses and live dialogue uses the default microphone", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  await access(new URL("../public/character-corpse-atlas.png", import.meta.url));
+  assert.match(page, /const corpseLoot/);
+  assert.match(page, /lootedCorpses: cloneValue\(lootedCorpses\)/);
+  assert.match(page, /kind: "corpse"/);
+  assert.match(page, /lootCorpse/);
+  assert.match(page, /SpeechRecognition/);
+  assert.match(page, /webkitSpeechRecognition/);
+  assert.match(page, /life-is-a-gamble-live-conversation/);
+  assert.match(page, /speakRef\.current\(clean\)/);
+  assert.match(css, /character-corpse-atlas\.png/);
+  assert.match(css, /\.live-toggle/);
 });
 
 test("dialogue can create validated quests and recruit a companion", async () => {
@@ -147,7 +168,7 @@ test("versioned save slots persist the complete RPG state in the native game", a
     readFile(new URL("../game/src/main.cjs", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /SAVE_SCHEMA_VERSION = 2/);
+  assert.match(page, /SAVE_SCHEMA_VERSION = 3/);
   assert.match(page, /MAX_MANUAL_SAVES = 8/);
   assert.match(page, /const makeSnapshot/);
   assert.match(page, /quests: cloneValue\(quests\)/);

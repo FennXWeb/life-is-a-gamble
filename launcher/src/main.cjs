@@ -128,6 +128,7 @@ async function installGameUpdate(asset) {
   sendUpdateState({ phase: "game-installing", busy: true, percent: 100, message: `Applying game ${asset.version}…` });
   await promoteDownload(downloadPath, managedGamePath());
   await fs.writeFile(managedGameVersionPath(), JSON.stringify({ version: asset.version, installedAt: new Date().toISOString() }, null, 2), "utf8");
+  sendUpdateState({ gameVersion: asset.version });
 }
 
 async function performUpdateCheck() {
@@ -167,10 +168,17 @@ function checkForUpdates() {
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
-    width: 1180,
-    height: 720,
-    minWidth: 980,
-    minHeight: 620,
+    width: 1240,
+    height: 760,
+    minWidth: 1240,
+    minHeight: 760,
+    maxWidth: 1240,
+    maxHeight: 760,
+    frame: false,
+    titleBarStyle: "hidden",
+    maximizable: false,
+    resizable: false,
+    fullscreenable: false,
     show: false,
     backgroundColor: "#090b08",
     title: "Life is a Gamble Launcher",
@@ -230,7 +238,9 @@ async function listBackups() {
   return saves.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-ipcMain.handle("launcher:get-state", async () => ({ version: app.getVersion(), channel: settings.channel, update: updateState, saves: await listBackups(), packaged: app.isPackaged }));
+ipcMain.handle("launcher:get-state", async () => ({ version: app.getVersion(), gameVersion: await installedGameVersion(), channel: settings.channel, update: updateState, saves: await listBackups(), packaged: app.isPackaged }));
+ipcMain.handle("launcher:minimize", () => launcherWindow?.minimize());
+ipcMain.handle("launcher:close", () => launcherWindow?.close());
 ipcMain.handle("launcher:launch-game", async () => {
   if (updateState.busy) return { ok: false, error: "Finish the update before launching." };
   try {

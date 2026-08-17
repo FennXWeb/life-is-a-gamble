@@ -9,47 +9,58 @@
 </head>
 <body>
   <main class="launcher-shell">
-    <header class="topbar">
-      <div class="brand"><small>FENNX // FIELD TERMINAL</small><h1>LIFE <i>IS A</i> GAMBLE</h1></div>
-      <div class="connection"><span class="lamp"></span><div><small>GAME INSTALLATION</small><strong id="network-status">NATIVE</strong></div></div>
+    <header class="titlebar">
+      <div class="brand">
+        <span class="brand-mark">LG</span>
+        <div><small>FENNX CREATIVE</small><h1>LIFE <i>IS A</i> GAMBLE</h1></div>
+      </div>
+      <div class="titlebar-status"><span class="signal"></span><small>FIELD TERMINAL</small><strong id="network-status">NATIVE</strong></div>
+      <div class="window-controls">
+        <button id="minimize-window" aria-label="Minimize launcher" title="Minimize">—</button>
+        <button id="close-window" class="close-window" aria-label="Close launcher" title="Close">×</button>
+      </div>
     </header>
 
     <section class="hero">
+      <div class="hero-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <div class="hero-copy">
-        <small>UPSTATE NEW YORK · 2186</small>
-        <h2>THE HOUSE<br>ALWAYS LISTENS.</h2>
-        <p>Continue into the ruins of Syracuse. Your saves, release channel, and field updates are managed here.</p>
+        <small>SYRACUSE EXCLUSION ZONE · 2186</small>
+        <h2>THE HOUSE<br><em>ALWAYS LISTENS.</em></h2>
+        <span class="hero-rule"></span>
       </div>
-      <div class="syracuse-map" aria-hidden="true"><i></i><i></i><i></i><b>SYRACUSE</b><span>43.0481° N<br>76.1474° W</span></div>
+      <div class="syracuse-map" aria-hidden="true">
+        <div class="map-scan"></div><i></i><i></i><i></i><b>SYRACUSE</b><span>43.0481° N<br>76.1474° W</span>
+      </div>
     </section>
 
     <section class="control-deck">
       <article class="update-card">
-        <header><div><small>INSTALLATION STATUS</small><strong id="update-message">Ready to play</strong></div><button id="check-update">CHECK</button></header>
+        <header><div><small>INSTALLATION</small><strong id="update-message">READY TO PLAY</strong></div><button id="check-update">CHECK</button></header>
         <div class="progress-track"><i id="progress-bar"></i></div>
         <div class="update-meta"><span id="progress-label">0%</span><span>LAUNCHER <b id="app-version">—</b></span></div>
       </article>
 
       <article class="channel-card">
-        <small>RELEASE BRANCH</small>
-        <label for="release-channel">Update channel</label>
+        <small>RELEASE CHANNEL</small>
+        <label for="release-channel">SELECT BUILD STREAM</label>
         <select id="release-channel"><option value="main">MAIN · STABLE</option><option value="testing">TESTING · PRERELEASE</option></select>
-        <p id="channel-note">Stable builds selected for general play.</p>
+        <div class="channel-indicator"><i></i><span>CHANNEL</span><b id="footer-channel">MAIN</b></div>
       </article>
 
       <article class="save-card">
         <header><div><small>COURIER ARCHIVE</small><strong>SAVE BACKUPS</strong></div><button id="open-saves">OPEN FOLDER</button></header>
-        <div class="save-actions"><input id="backup-name" maxlength="60" placeholder="Backup name"><button id="create-backup">BACK UP ACTIVE SAVE</button><button id="reset-save" class="danger">RESET ACTIVE</button></div>
-        <div id="save-list" class="save-list"><p class="empty">No save backups yet.</p></div>
+        <div class="save-actions"><input id="backup-name" maxlength="60" placeholder="BACKUP NAME"><button id="create-backup">CREATE</button><button id="reset-save" class="danger">RESET</button></div>
+        <div id="save-list" class="save-list"><p class="empty">NO BACKUPS</p></div>
       </article>
 
       <article class="launch-card">
-        <div><small>ACTIVE INSTALLATION</small><strong>SYRACUSE BUILD</strong><span id="launch-status">READY</span></div>
+        <div class="active-build"><small>ACTIVE BUILD</small><strong>SYRACUSE</strong><span id="active-game-version">GAME v—</span></div>
         <button id="apply-update" hidden>RESTART & APPLY</button>
-        <button id="launch-game">LAUNCH GAME <b>▶</b></button>
+        <button id="launch-game"><span>LAUNCH GAME</span><b>▶</b></button>
       </article>
     </section>
-    <footer><span>BUILD CHANNEL <b id="footer-channel">MAIN</b></span><span>Save data remains on this device.</span><span>© 2026 FENNXWEB</span></footer>
+
+    <footer><span>FENNX CREATIVE</span><span>© 2026 FENNX CREATIVE</span></footer>
     <div id="toast" role="status" aria-live="polite"></div>
   </main>
   <script src="renderer.js"></script>

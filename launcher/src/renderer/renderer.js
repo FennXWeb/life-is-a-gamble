@@ -1,7 +1,7 @@
 const elements = {
-  version: document.querySelector("#app-version"), channel: document.querySelector("#release-channel"), channelNote: document.querySelector("#channel-note"), footerChannel: document.querySelector("#footer-channel"),
+  version: document.querySelector("#app-version"), gameVersion: document.querySelector("#active-game-version"), channel: document.querySelector("#release-channel"), footerChannel: document.querySelector("#footer-channel"),
   updateMessage: document.querySelector("#update-message"), progress: document.querySelector("#progress-bar"), progressLabel: document.querySelector("#progress-label"), network: document.querySelector("#network-status"),
-  launch: document.querySelector("#launch-game"), launchStatus: document.querySelector("#launch-status"), apply: document.querySelector("#apply-update"), check: document.querySelector("#check-update"),
+  launch: document.querySelector("#launch-game"), apply: document.querySelector("#apply-update"), check: document.querySelector("#check-update"),
   saveList: document.querySelector("#save-list"), backupName: document.querySelector("#backup-name"), toast: document.querySelector("#toast"),
 };
 
@@ -23,7 +23,7 @@ function renderUpdate(update) {
   elements.launch.disabled = Boolean(update.busy);
   elements.check.disabled = Boolean(update.busy);
   elements.channel.disabled = Boolean(update.busy);
-  elements.launchStatus.textContent = update.busy ? "UPDATE IN PROGRESS" : update.phase === "error" ? "UPDATE CHECK FAILED" : "READY";
+  if (update.gameVersion) elements.gameVersion.textContent = `GAME v${update.gameVersion}`;
   elements.network.textContent = update.phase === "error" ? "PATCH OFFLINE" : "NATIVE";
   elements.apply.hidden = update.phase !== "launcher-downloaded";
 }
@@ -31,13 +31,12 @@ function renderUpdate(update) {
 function renderChannel(channel) {
   elements.channel.value = channel;
   elements.footerChannel.textContent = channel.toUpperCase();
-  elements.channelNote.textContent = channel === "testing" ? "Early builds intended for testing and feedback." : "Stable builds selected for general play.";
 }
 
 function renderSaves(saves) {
   elements.saveList.replaceChildren();
   if (!saves.length) {
-    const empty = document.createElement("p"); empty.className = "empty"; empty.textContent = "No save backups yet."; elements.saveList.append(empty); return;
+    const empty = document.createElement("p"); empty.className = "empty"; empty.textContent = "NO BACKUPS"; elements.saveList.append(empty); return;
   }
   for (const save of saves) {
     const row = document.createElement("div"); row.className = "save-row";
@@ -54,6 +53,7 @@ function renderSaves(saves) {
 async function init() {
   launcherState = await window.launcher.getState();
   elements.version.textContent = `v${launcherState.version}`;
+  elements.gameVersion.textContent = `GAME v${launcherState.gameVersion}`;
   renderChannel(launcherState.channel);
   renderUpdate(launcherState.update);
   renderSaves(launcherState.saves);
@@ -61,6 +61,8 @@ async function init() {
 }
 
 elements.launch.addEventListener("click", async () => { const result = await window.launcher.launchGame(); if (!result.ok) toast(result.error); });
+document.querySelector("#minimize-window").addEventListener("click", () => window.launcher.minimizeWindow());
+document.querySelector("#close-window").addEventListener("click", () => window.launcher.closeWindow());
 elements.check.addEventListener("click", () => window.launcher.checkUpdates().catch((error) => toast(error.message)));
 elements.apply.addEventListener("click", () => window.launcher.installUpdate());
 elements.channel.addEventListener("change", async () => { try { const result = await window.launcher.setChannel(elements.channel.value); renderChannel(result.channel); } catch (error) { toast(error.message); } });

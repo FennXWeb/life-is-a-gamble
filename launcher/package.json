@@ -1,9 +1,9 @@
 {
   "name": "life-is-a-gamble-launcher",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Windows launcher and updater for Life is a Gamble",
   "main": "src/main.cjs",
-  "author": "FennXWeb",
+  "author": "FennX Creative",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {

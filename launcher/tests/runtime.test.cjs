@@ -28,6 +28,28 @@ test("successful game launch hides and closes the launcher", () => {
   assert.match(main, /phase: "launcher-downloaded"/);
 });
 
+test("launcher uses custom frameless chrome and reports the installed game version", () => {
+  const main = read("src/main.cjs");
+  const preload = read("src/preload.cjs");
+  const renderer = read("src/renderer/renderer.js");
+  const html = read("src/renderer/index.html");
+  const css = read("src/renderer/styles.css");
+  assert.match(main, /frame: false/);
+  assert.match(main, /maximizable: false/);
+  assert.match(main, /resizable: false/);
+  assert.match(main, /launcher:minimize/);
+  assert.match(main, /launcher:close/);
+  assert.match(main, /gameVersion: await installedGameVersion\(\)/);
+  assert.match(preload, /minimizeWindow/);
+  assert.match(preload, /closeWindow/);
+  assert.match(renderer, /active-game-version/);
+  assert.match(html, /id="minimize-window"/);
+  assert.match(html, /id="close-window"/);
+  assert.doesNotMatch(html, /maximize-window|save data remains|stable public builds/i);
+  assert.match(html, /FENNX CREATIVE/);
+  assert.match(css, /-webkit-app-region:drag/);
+});
+
 test("game updates download, verify, and promote without a launcher restart", async () => {
   assert.equal(compareVersions("1.0.12-testing.0", "1.0.11-testing.0"), 1);
   assert.equal(compareVersions("1.1.0-testing.0", "1.1.0"), 0);

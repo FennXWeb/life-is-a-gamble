@@ -12,13 +12,14 @@ type LogEntry = { id: number; tone: "system" | "good" | "bad" | "plain"; text: s
 type InteractionTarget = {
   id: string;
   label: string;
-  kind: "door" | "prop" | "npc";
+  kind: "door" | "prop" | "npc" | "corpse";
   locked?: boolean;
   lockpick?: boolean;
   inaccessible?: boolean;
   interior?: string;
   action?: "search" | "inspect";
   npcId?: NpcId;
+  corpseId?: NpcId;
   canTalk?: boolean;
 };
 type NpcState = {
@@ -28,6 +29,26 @@ type NpcState = {
   mood: string;
   opinion: string;
   memories: string[];
+};
+
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+};
+type SpeechRecognitionController = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
 };
 
 type WorldPoint = { x: number; y: number };
@@ -188,7 +209,7 @@ type InventoryItem = { id: number; name: string; icon: string; x: number; y: num
 
 const ACTIVE_SAVE_KEY = "life-is-a-gamble-save";
 const SAVE_SLOTS_KEY = "life-is-a-gamble-save-slots";
-const SAVE_SCHEMA_VERSION = 2;
+const SAVE_SCHEMA_VERSION = 3;
 const MAX_MANUAL_SAVES = 8;
 
 type GameSnapshot = {
@@ -215,6 +236,7 @@ type GameSnapshot = {
   unlockedDoors: string[];
   playerPosition: WorldPoint;
   enemyPosition: WorldPoint;
+  lootedCorpses: NpcId[];
   inventory: InventoryItem[];
   quests: QuestState[];
   companions: CompanionState[];
@@ -248,7 +270,6 @@ const inventoryItems: InventoryItem[] = [
   { id: 3, name: "Dried Apples", icon: "●", x: 2, y: 0, w: 1, h: 1, note: "+8 HP · tastes like paper", weight: .4, equipped: null },
   { id: 4, name: "Bent Lockpick", icon: "⌁", x: 0, y: 0, w: 1, h: 2, note: "+5% Lockpick · fragile", weight: .1, equipped: null },
   { id: 5, name: "Old Chips", icon: "◉", x: 3, y: 0, w: 2, h: 2, note: "Currency · 37 chips", weight: 1.2, equipped: null },
-  { id: 6, name: "Squirrel Tail", icon: "〰", x: 5, y: 0, w: 1, h: 2, note: "Quest item · still warm", weight: .3, equipped: null },
   { id: 7, name: "Welding Hood", icon: "◒", x: 6, y: 0, w: 2, h: 2, note: "+1 Perception defense · smoked lens", weight: 1.8, fits: "head", equipped: null },
   { id: 8, name: "Work Gloves", icon: "✥", x: 8, y: 0, w: 2, h: 1, note: "+1 Mechanics · cracked leather", weight: .6, fits: "hands", equipped: null },
   { id: 9, name: "Road Boots", icon: "⌊", x: 8, y: 2, w: 2, h: 2, note: "+1 Survival · resoled twice", weight: 2.4, fits: "feet", equipped: null },
@@ -262,6 +283,16 @@ const dialogueItemCatalog: Record<string, InventoryItem> = {
   "field-bandage": { id: 103, name: "Field Bandage", icon: "+", x: 0, y: 0, w: 1, h: 1, note: "+6 HP · clean by wasteland standards", weight: .2, equipped: null },
   "scrapshot-box": { id: 104, name: "Scrapshot Box", icon: "∷", x: 0, y: 0, w: 1, h: 1, note: "12 rounds · mixed .22 scrapshot", weight: .7, equipped: null },
   "spare-lockpick": { id: 105, name: "Spare Lockpick", icon: "⌁", x: 0, y: 0, w: 1, h: 2, note: "+5% Lockpick · Rowan's spare", weight: .1, equipped: null },
+};
+
+const corpseLoot: Record<NpcId, InventoryItem[]> = {
+  squirrel: [
+    { id: 201, name: "Squirrel Tail", icon: "〰", x: 0, y: 0, w: 1, h: 2, note: "Trophy · fever-warm fur", weight: .3, equipped: null },
+  ],
+  rowan: [
+    { id: 202, name: "Rowan's Revolver", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "7–11 DMG · worn walnut grip", weight: 2.4, fits: "holster", equipped: null },
+    { ...dialogueItemCatalog["rowan-map"], id: 203 },
+  ],
 };
 
 function inventoryKey(item: InventoryItem) {
@@ -286,6 +317,11 @@ function Sprite({ row, col, label, className = "" }: { row: number; col: number;
       style={{ backgroundPosition: `${col * 25}% ${row * 50}%` }}
     />
   );
+}
+
+function CorpseSprite({ character, label }: { character: "courier" | NpcId; label: string }) {
+  const column = character === "courier" ? 0 : character === "rowan" ? 1 : 2;
+  return <div className={`corpse-sprite corpse-${character}`} role="img" aria-label={label} style={{ backgroundPosition: `${column * 50}% 50%` }} />;
 }
 
 function NpcActor({ className, status, statusTone, row, col, label, motion = "idle", facing = "right", position, transitionMs = 0, selected = false, onClick, onContextMenu }: {
@@ -379,8 +415,9 @@ function ModularBuilding({ className, name, subtitle, material, floors, bays, do
     else if (floor < floors - 1) col = damaged && (index + bay) % 5 === 0 ? 2 : material === "stone" && bay % 3 === 0 ? 2 : 1;
     else col = bay % 2 === 0 ? 0 : 1;
     if (isDoor) { row = 2; col = 0; }
-    const tile = facade && isDoor ? null : <BuildingTile row={row} col={col} className={isDoor ? "door-tile" : ""} />;
-    return isDoor && door ? <button key={index} className={`building-door-cell${facade ? " facade-door-hitbox" : ""}`} onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}>{tile}</button> : <div key={index} className="building-cell">{tile}</div>;
+    const tile = <BuildingTile row={row} col={col} className={isDoor ? "door-tile" : ""} />;
+    if (facade) return <div key={index} className="building-cell">{tile}</div>;
+    return isDoor && door ? <button key={index} className="building-door-cell" onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}>{tile}</button> : <div key={index} className="building-cell">{tile}</div>;
   });
   return <section className={`modular-building ${className} ${material}${facade ? ` has-facade facade-kind-${facade.kind} facade-id-${facade.id}` : ""}`} style={{ "--bays": bays, "--floors": floors } as CSSProperties} onClick={(event) => event.stopPropagation()}>
     <div className="building-roof"><BuildingTile row={2} col={2} /></div>
@@ -388,6 +425,7 @@ function ModularBuilding({ className, name, subtitle, material, floors, bays, do
     <div className="building-face">
       {facade && <div className={`building-facade-art ${facade.kind} facade-${facade.id}`} style={{ backgroundImage: `url('/${facade.kind === "landmark" ? "landmarks" : "storefronts"}/${facade.id}.png')` }} aria-hidden="true" />}
       {cells}
+      {facade && door && <button className={`facade-door-hitbox facade-door-${facade.id}`} onClick={(event) => onInteract(event, door)} onContextMenu={(event) => onInteract(event, door)} aria-label={`Interact with ${door.label}`}><span>ENTRY</span></button>}
     </div>
     <div className="building-cornice"><BuildingTile row={material === "stone" ? 1 : 0} col={3} /></div>
     <div className={`building-sign sign-${facade?.id ?? "default"}`}><strong>{name}</strong><small>{subtitle}</small></div>
@@ -414,6 +452,11 @@ const interactions: Record<string, InteractionTarget> = {
 const npcInteractions: Record<NpcId, InteractionTarget> = {
   rowan: { id: "npc-rowan", label: "Rowan Vale", kind: "npc", npcId: "rowan", canTalk: true },
   squirrel: { id: "npc-squirrel", label: "Rabid Squirrel", kind: "npc", npcId: "squirrel", canTalk: false },
+};
+
+const corpseInteractions: Record<NpcId, InteractionTarget> = {
+  rowan: { id: "corpse-rowan", label: "Rowan Vale's Body", kind: "corpse", corpseId: "rowan" },
+  squirrel: { id: "corpse-squirrel", label: "Rabid Squirrel Corpse", kind: "corpse", corpseId: "squirrel" },
 };
 
 const cityDecor = [
@@ -488,9 +531,11 @@ export default function Home() {
   const [dialogueInput, setDialogueInput] = useState("");
   const [dialogueBusy, setDialogueBusy] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [liveConversation, setLiveConversation] = useState(() => typeof window !== "undefined" && localStorage.getItem("life-is-a-gamble-live-conversation") === "true");
   const [speakingCharacter, setSpeakingCharacter] = useState<"YOU" | "ROWAN" | null>(null);
   const [dialogueEngine, setDialogueEngine] = useState<"ai" | "local" | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>(inventoryItems);
+  const [lootedCorpses, setLootedCorpses] = useState<NpcId[]>([]);
   const [quests, setQuests] = useState<QuestState[]>(initialQuests);
   const [companions, setCompanions] = useState<CompanionState[]>(initialCompanions);
   const [saveReady, setSaveReady] = useState(false);
@@ -555,6 +600,7 @@ export default function Home() {
     unlockedDoors: cloneValue(unlockedDoors),
     playerPosition: cloneValue(playerPosition),
     enemyPosition: cloneValue(enemyPosition),
+    lootedCorpses: cloneValue(lootedCorpses),
     inventory: cloneValue(inventory),
     quests: cloneValue(quests),
     companions: cloneValue(companions),
@@ -595,6 +641,7 @@ export default function Home() {
       setDestination(save.playerPosition);
     }
     if (save.enemyPosition && typeof save.enemyPosition.x === "number" && typeof save.enemyPosition.y === "number") setEnemyPosition(save.enemyPosition);
+    if (Array.isArray(save.lootedCorpses)) setLootedCorpses(save.lootedCorpses.filter((id): id is NpcId => id === "rowan" || id === "squirrel"));
     if (Array.isArray(save.inventory) && save.inventory.length) setInventory(save.inventory);
     if (Array.isArray(save.quests)) {
       setQuests(save.quests);
@@ -656,7 +703,11 @@ export default function Home() {
       });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [saveReady, saveSlotsReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, unlockedDoors, playerPosition, enemyPosition, inventory, quests, companions, interior, selectedAction]);
+  }, [saveReady, saveSlotsReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, unlockedDoors, playerPosition, enemyPosition, lootedCorpses, inventory, quests, companions, interior, selectedAction]);
+
+  useEffect(() => {
+    localStorage.setItem("life-is-a-gamble-live-conversation", String(liveConversation));
+  }, [liveConversation]);
 
   useEffect(() => {
     if (!saveSlotsReady) return;
@@ -803,7 +854,7 @@ export default function Home() {
     setPlayerPosition({ x: 51, y: 71 }); setDestination({ x: 51, y: 71 }); setWalking(false);
     setEnemyPosition({ x: 66, y: 78 }); setEnemyMoving(false);
     setUnlockedDoors([]); setInterior(null); setDialogueInput(""); setDialogueEngine(null);
-    setInventory(cloneValue(inventoryItems)); setQuests(cloneValue(initialQuests)); setCompanions(cloneValue(initialCompanions));
+    setInventory(cloneValue(inventoryItems)); setLootedCorpses([]); setQuests(cloneValue(initialQuests)); setCompanions(cloneValue(initialCompanions));
     setNpc({ trust: 18, respect: 24, fear: 8, mood: "Wary", opinion: "Another hungry drifter with a loaded question.", memories: ["Saw you approach the Salt Yard alone."] });
     setConversation([{ speaker: "ROWAN", text: "Easy. I’m not after your pack. Name’s Rowan. You always walk straight toward rabid wildlife, or is today special?" }]);
     setWorldFlags(["Rowan met at Salt Yard"]);
@@ -933,7 +984,7 @@ export default function Home() {
     }
   };
 
-  const useProp = (target: InteractionTarget) => {
+  const interactWithProp = (target: InteractionTarget) => {
     setContextMenu(null);
     if (target.action === "search") {
       if (worldFlags.includes("Downtown sedan searched")) addLog("The sedan has already been picked clean.");
@@ -944,6 +995,30 @@ export default function Home() {
         addLog("You search the sedan: 4 chips and a damp parking receipt.", "good");
       }
     } else addLog("The lamp bears a municipal seal dated 2039. Its copper wiring is gone.");
+  };
+
+  const lootCorpse = (corpseId: NpcId) => {
+    setContextMenu(null);
+    if (lootedCorpses.includes(corpseId)) {
+      addLog(corpseId === "rowan" ? "Rowan's body has already been searched." : "The squirrel corpse has already been searched.");
+      return;
+    }
+    const nextInventory = cloneValue(inventory);
+    const recovered: string[] = [];
+    for (const template of corpseLoot[corpseId]) {
+      if (nextInventory.some((item) => item.name === template.name)) continue;
+      const space = findInventorySpace(nextInventory, template.w, template.h);
+      if (!space) {
+        addLog("PACK FULL · Make room before looting the corpse.", "bad");
+        return;
+      }
+      nextInventory.push({ ...cloneValue(template), ...space, id: Math.max(0, ...nextInventory.map((item) => item.id)) + 1 });
+      recovered.push(template.name);
+    }
+    setInventory(nextInventory);
+    setLootedCorpses((ids) => [...new Set([...ids, corpseId])]);
+    audio.play("loot");
+    addLog(recovered.length ? "CORPSE LOOTED · " + recovered.join(" · ") : "The corpse carries nothing you can use.", recovered.length ? "good" : "plain");
   };
 
   const awardXp = (amount: number) => {
@@ -1132,10 +1207,9 @@ export default function Home() {
           setQuests((entries) => entries.map((quest) => quest.giver === "Rowan Vale" && quest.status === "active" ? { ...quest, status: "failed", history: [...quest.history, "Failed when Rowan Vale was killed."].slice(-10), updatedAt: Date.now() } : quest));
           addLog("ROWAN FALLS · +40 XP · Her story ends here.", "bad");
         } else {
-          setChips((v) => v + 6);
           awardXp(65);
           if (!worldFlags.includes("Salt Yard squirrel killed")) setWorldFlags((v) => [...v, "Salt Yard squirrel killed"]);
-          addLog("ENCOUNTER WON · +65 XP · +6 chips · Squirrel Tail found.", "good");
+          addLog("ENCOUNTER WON · +65 XP · The squirrel's corpse can now be looted.", "good");
           const questEffect = finishQuest("salt-yard-pest", "completed", "The Courier killed the rabid squirrel at Armory Alley.");
           if (questEffect) addLog(questEffect, "good");
         }
@@ -1440,8 +1514,8 @@ export default function Home() {
     }
   };
 
-  const speak = async () => {
-    const message = dialogueInput.trim();
+  const speak = async (spokenMessage?: string) => {
+    const message = (spokenMessage ?? dialogueInput).trim();
     if (!message || dialogueBusy) return;
     setDialogueInput("");
     setConversation((v) => [...v, { speaker: "YOU", text: message }]);
@@ -1654,6 +1728,8 @@ export default function Home() {
               onClick={(event) => { event.stopPropagation(); selectNpc("squirrel"); }}
               onContextMenu={(event) => openNpcInteraction(event, "squirrel")}
             />}
+            {rowanHp <= 0 && <button className={`corpse-actor corpse-actor-rowan${lootedCorpses.includes("rowan") ? " looted" : ""}`} style={{ left: "38%", top: "74%" }} onClick={(event) => openInteraction(event, corpseInteractions.rowan)} onContextMenu={(event) => openInteraction(event, corpseInteractions.rowan)} aria-label="Loot Rowan Vale's body"><CorpseSprite character="rowan" label="Rowan Vale lying dead" /><span>{lootedCorpses.includes("rowan") ? "SEARCHED" : "LOOT"}</span></button>}
+            {enemyHp <= 0 && <button className={`corpse-actor corpse-actor-squirrel${lootedCorpses.includes("squirrel") ? " looted" : ""}`} style={{ left: `${enemyPosition.x}%`, top: `${enemyPosition.y + 1}%` }} onClick={(event) => openInteraction(event, corpseInteractions.squirrel)} onContextMenu={(event) => openInteraction(event, corpseInteractions.squirrel)} aria-label="Loot rabid squirrel corpse"><CorpseSprite character="squirrel" label="Rabid squirrel lying dead" /><span>{lootedCorpses.includes("squirrel") ? "SEARCHED" : "LOOT"}</span></button>}
             <div className="control-hint"><b>LEFT CLICK</b> WALK / TARGET NPC <i>•</i> <b>RIGHT CLICK</b> TALK / INTERACT</div>
           </> : <div className="interior-scene">
             <div className="interior-wall left-wall" /><div className="interior-wall right-wall" />
@@ -1674,7 +1750,10 @@ export default function Home() {
               <button disabled={!contextMenu.target.canTalk || contextMenu.target.npcId !== "rowan" || rowanHp <= 0 || combat === "enemy"} onClick={() => { setContextMenu(null); setPanel("dialogue"); }}><b>“</b><span>TALK<small>{contextMenu.target.canTalk ? "Open dialogue" : "It cannot be reasoned with"}</small></span></button>
               <button onClick={() => { const npcId = contextMenu.target.npcId; setContextMenu(null); if (npcId) startCombat(npcId); }} disabled={!contextMenu.target.npcId || combat === "enemy"}><b>⌖</b><span>ATTACK<small>Initiate turn-based combat</small></span></button>
               <button onClick={() => { addLog(`${contextMenu.target.label}: ${contextMenu.target.npcId === "rowan" ? npc.opinion : "Fever-bright eyes track every movement."}`); setContextMenu(null); }}><b>?</b><span>EXAMINE<small>Read current disposition</small></span></button>
-            </> : <button onClick={() => useProp(contextMenu.target)}><b>⌕</b><span>{contextMenu.target.action === "search" ? "SEARCH" : "INSPECT"}<small>Interact with object</small></span></button>}
+            </> : contextMenu.target.kind === "corpse" ? <>
+              <button onClick={() => contextMenu.target.corpseId && lootCorpse(contextMenu.target.corpseId)} disabled={!contextMenu.target.corpseId || lootedCorpses.includes(contextMenu.target.corpseId)}><b>▦</b><span>{contextMenu.target.corpseId && lootedCorpses.includes(contextMenu.target.corpseId) ? "SEARCHED" : "LOOT"}<small>Transfer carried items to pack</small></span></button>
+              <button onClick={() => { addLog(contextMenu.target.corpseId === "rowan" ? "Rowan Vale is dead. Her body will remain where she fell." : "The rabid animal is dead. Its body will remain in Armory Alley."); setContextMenu(null); }}><b>?</b><span>EXAMINE<small>Inspect remains</small></span></button>
+            </> : <button onClick={() => interactWithProp(contextMenu.target)}><b>⌕</b><span>{contextMenu.target.action === "search" ? "SEARCH" : "INSPECT"}<small>Interact with object</small></span></button>}
           </div>}
           {combat === "won" && <div className="victory-stamp">{combatTarget === "rowan" ? "ROWAN DEFEATED" : "ARMORY ALLEY CLEARED"} <span>{combatTarget === "rowan" ? "+40 XP" : "+65 XP"}</span></div>}
         </section>
@@ -1750,8 +1829,10 @@ export default function Home() {
                 busy={dialogueBusy}
                 reels={reels}
                 voiceEnabled={voiceEnabled}
+                liveConversation={liveConversation}
                 speakingCharacter={speakingCharacter}
                 toggleVoice={toggleVoice}
+                toggleLiveConversation={() => setLiveConversation((enabled) => !enabled)}
                 engine={dialogueEngine}
                 activeQuestCount={quests.filter((quest) => quest.status === "active").length}
                 companionStatus={companions.find((companion) => companion.id === "rowan")?.status || "available"}
@@ -2001,12 +2082,65 @@ function Journal({ quests, companions, dismiss }: { quests: QuestState[]; compan
   </div>;
 }
 
-function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, speakingCharacter, toggleVoice, engine, activeQuestCount, companionStatus, combatActive }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: () => void; busy: boolean; reels: string[]; voiceEnabled: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; engine: "ai" | "local" | null; activeQuestCount: number; companionStatus: CompanionState["status"]; combatActive: boolean }) {
+function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voiceEnabled, liveConversation, speakingCharacter, toggleVoice, toggleLiveConversation, engine, activeQuestCount, companionStatus, combatActive }: { npc: NpcState; conversation: { speaker: string; text: string }[]; input: string; setInput: (v: string) => void; speak: (spokenMessage?: string) => void; busy: boolean; reels: string[]; voiceEnabled: boolean; liveConversation: boolean; speakingCharacter: "YOU" | "ROWAN" | null; toggleVoice: () => void; toggleLiveConversation: () => void; engine: "ai" | "local" | null; activeQuestCount: number; companionStatus: CompanionState["status"]; combatActive: boolean }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionController | null>(null);
+  const speakRef = useRef(speak);
+  const submittedSpeech = useRef(false);
+  const [micState, setMicState] = useState<"off" | "ready" | "listening" | "processing" | "denied" | "unsupported">("off");
+  useEffect(() => { speakRef.current = speak; }, [speak]);
   useEffect(() => {
     const box = transcriptRef.current;
     if (box) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
   }, [conversation, busy]);
+  useEffect(() => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    submittedSpeech.current = false;
+    if (!liveConversation) { setMicState("off"); return; }
+    if (busy || speakingCharacter || combatActive) { setMicState(busy ? "processing" : "ready"); return; }
+    const speechWindow = window as Window & {
+      SpeechRecognition?: new () => SpeechRecognitionController;
+      webkitSpeechRecognition?: new () => SpeechRecognitionController;
+    };
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Recognition) { setMicState("unsupported"); return; }
+    const recognition = new Recognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.onstart = () => setMicState("listening");
+    recognition.onresult = (event) => {
+      let transcript = "";
+      let final = false;
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        transcript += event.results[index][0]?.transcript || "";
+        final = final || event.results[index].isFinal;
+      }
+      const clean = transcript.trim();
+      if (clean) setInput(clean);
+      if (final && clean && !submittedSpeech.current) {
+        submittedSpeech.current = true;
+        setMicState("processing");
+        recognition.stop();
+        window.setTimeout(() => speakRef.current(clean), 80);
+      }
+    };
+    recognition.onerror = (event) => {
+      setMicState(event.error === "not-allowed" || event.error === "service-not-allowed" ? "denied" : "ready");
+    };
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      if (!submittedSpeech.current) setMicState("ready");
+    };
+    recognitionRef.current = recognition;
+    try { recognition.start(); } catch { setMicState("ready"); }
+    return () => {
+      recognition.onend = null;
+      recognition.stop();
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+    };
+  }, [liveConversation, busy, speakingCharacter, combatActive, setInput]);
   return <div className="dialogue-view">
     <aside className="npc-dossier">
       <div className="npc-portrait"><Sprite row={2} col={0} label="Head-and-shoulders portrait of Rowan Vale" /></div>
@@ -2019,9 +2153,9 @@ function Dialogue({ npc, conversation, input, setInput, speak, busy, reels, voic
       <div className="likes"><span><b>LIKES</b> candor, maps, coffee</span><span><b>DISLIKES</b> Citadel clerks, threats</span></div>
     </aside>
     <section className="conversation">
-      <div className={`conversation-head${combatActive ? " hostile" : ""}`}><div><small>{combatActive ? "HOSTILITIES · ROWAN HAS INITIATIVE" : `LIVE CHARACTER SIMULATION · ${engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}`}</small><strong>{combatActive ? "Rowan drew first. Combat is beginning…" : "Say anything. Rowan remembers—and acts."}</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"} · {activeQuestCount} ACTIVE QUEST{activeQuestCount === 1 ? "" : "S"} · PARTY {companionStatus.toUpperCase()}</em></div><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
+      <div className={`conversation-head${combatActive ? " hostile" : ""}`}><div><small>{combatActive ? "HOSTILITIES · ROWAN HAS INITIATIVE" : `LIVE CHARACTER SIMULATION · ${engine === "local" ? "LOCAL FALLBACK" : engine === "ai" ? "AI DIRECTOR" : "READY"}`}</small><strong>{combatActive ? "Rowan drew first. Combat is beginning…" : "Say anything. Rowan remembers—and acts."}</strong><em>{speakingCharacter ? `VOICE · ${speakingCharacter} SPEAKING` : voiceEnabled ? "VOICE · READY" : "VOICE · MUTED"} · {activeQuestCount} ACTIVE QUEST{activeQuestCount === 1 ? "" : "S"} · PARTY {companionStatus.toUpperCase()}</em></div><button className={`live-toggle ${liveConversation ? "on" : ""}`} onClick={toggleLiveConversation} aria-pressed={liveConversation} aria-label={liveConversation ? "Disable live microphone conversation" : "Enable live microphone conversation"}><b>{micState === "listening" ? "●" : "◉"}</b><small>{liveConversation ? micState.toUpperCase() : "LIVE MIC"}</small></button><button className={`voice-toggle ${voiceEnabled ? "on" : ""}`} onClick={toggleVoice} aria-pressed={voiceEnabled} aria-label={voiceEnabled ? "Mute character voices" : "Enable character voices"}>{voiceEnabled ? "◖))" : "◖×"}<small>{voiceEnabled ? "VOICES ON" : "VOICES OFF"}</small></button><div className="mini-slot">{reels.map((r, i) => <b key={i}>{r}</b>)}</div></div>
       <div className="transcript" ref={transcriptRef} tabIndex={0} aria-label="Scrollable conversation transcript">{conversation.map((line, i) => <div key={i} className={line.speaker === "YOU" ? "player-line" : line.speaker === "WORLD" ? "world-line" : "npc-line"}><span>{line.speaker}<i>{line.speaker === "YOU" ? "CEDAR · ADULT BARITONE" : line.speaker === "WORLD" ? "STATE" : "MARIN · ADULT CONTRALTO"}</i></span><p>{line.text}</p></div>)}{busy && <div className="npc-line thinking"><span>ROWAN</span><p>Reading your words against memory, motive, and the state of the world…</p></div>}</div>
-      <div className={`dialogue-compose${combatActive ? " hostile" : ""}`}><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span></div><textarea value={input} disabled={busy || combatActive} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder={combatActive ? "Rowan has ended the conversation." : "Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action."} maxLength={500} /><button onClick={speak} disabled={busy || combatActive || !input.trim()}>{combatActive ? "ENEMY TURN" : busy ? "CALCULATING…" : "SAY IT"}</button><small>{combatActive ? "Dialogue choices are locked while Rowan takes her opening combat action." : "Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions."}</small></div>
+      <div className={`dialogue-compose${combatActive ? " hostile" : ""}`}><div className="check-hints"><span>[SPEECH {3}] Persuade</span><span>[BARTER {2}] Deal</span><span>[LUCK 6] Tempt fate</span>{liveConversation && <span className={`mic-state ${micState}`}>MIC · {micState.toUpperCase()}</span>}</div><textarea value={input} disabled={busy || combatActive} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); speak(); } }} placeholder={combatActive ? "Rowan has ended the conversation." : liveConversation ? "Speak naturally. A complete phrase is sent automatically…" : "Type anything to Rowan… ask, lie, threaten, joke, bargain, or request an action."} maxLength={500} /><button onClick={() => speak()} disabled={busy || combatActive || !input.trim()}>{combatActive ? "ENEMY TURN" : busy ? "CALCULATING…" : liveConversation && micState === "listening" ? "LISTENING…" : "SAY IT"}</button><small>{combatActive ? "Dialogue choices are locked while Rowan takes her opening combat action." : liveConversation ? "The default microphone pauses while voices play, then listens for your next turn automatically." : "Each turn checks relationships, memories, skills, Fate, inventory, combat, location, quests, and possible world actions."}</small></div>
     </section>
   </div>;
 }
