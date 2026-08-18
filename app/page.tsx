@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useGameAudio } from "./game-audio";
 import type { CompanionState, DialogueAction, DialogueGameSnapshot, DialogueTurn, QuestState } from "./dialogue-contract";
+import type { GameProject, LevelObject, SpriteAsset } from "./editor/project-types";
+import { WorldScene } from "./world/world-scene";
 
 type Panel = "inventory" | "skills" | "map" | "journal" | "dialogue" | "help" | "saves" | null;
 type CombatState = "idle" | "player" | "enemy" | "won";
@@ -21,6 +23,9 @@ type InteractionTarget = {
   npcId?: NpcId;
   corpseId?: NpcId;
   canTalk?: boolean;
+  authoredType?: SpriteAsset["category"];
+  tags?: string[];
+  trigger?: boolean;
 };
 type NpcState = {
   trust: number;
@@ -67,9 +72,9 @@ const fixedCollisionZones: CollisionZone[] = [
   { kind: "ellipse", x: 34, y: 61, rx: 3.2, ry: 1.8, label: "dead tree planter" },
 ];
 
-function pointBlocked(point: WorldPoint, dynamicZones: CollisionZone[] = []) {
-  if (point.x < WALKABLE_BOUNDS.x1 || point.x > WALKABLE_BOUNDS.x2 || point.y < WALKABLE_BOUNDS.y1 || point.y > WALKABLE_BOUNDS.y2) return true;
-  return [...fixedCollisionZones, ...dynamicZones].some((zone) => {
+function pointBlocked(point: WorldPoint, dynamicZones: CollisionZone[] = [], bounds = WALKABLE_BOUNDS, includeLegacy = true) {
+  if (point.x < bounds.x1 || point.x > bounds.x2 || point.y < bounds.y1 || point.y > bounds.y2) return true;
+  return [...(includeLegacy ? fixedCollisionZones : []), ...dynamicZones].some((zone) => {
     if (zone.kind === "rect") return point.x >= zone.x1 - PLAYER_CLEARANCE.x && point.x <= zone.x2 + PLAYER_CLEARANCE.x && point.y >= zone.y1 - PLAYER_CLEARANCE.y && point.y <= zone.y2 + PLAYER_CLEARANCE.y;
     const dx = (point.x - zone.x) / (zone.rx + PLAYER_CLEARANCE.x);
     const dy = (point.y - zone.y) / (zone.ry + PLAYER_CLEARANCE.y);
@@ -77,31 +82,31 @@ function pointBlocked(point: WorldPoint, dynamicZones: CollisionZone[] = []) {
   });
 }
 
-function segmentIsClear(from: WorldPoint, to: WorldPoint, dynamicZones: CollisionZone[] = []) {
+function segmentIsClear(from: WorldPoint, to: WorldPoint, dynamicZones: CollisionZone[] = [], bounds = WALKABLE_BOUNDS, includeLegacy = true) {
   const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / .55));
   for (let step = 1; step <= steps; step++) {
     const amount = step / steps;
-    if (pointBlocked({ x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount }, dynamicZones)) return false;
+    if (pointBlocked({ x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount }, dynamicZones, bounds, includeLegacy)) return false;
   }
   return true;
 }
 
-function findWalkPath(start: WorldPoint, requestedTarget: WorldPoint, dynamicZones: CollisionZone[] = []) {
+function findWalkPath(start: WorldPoint, requestedTarget: WorldPoint, dynamicZones: CollisionZone[] = [], bounds = WALKABLE_BOUNDS, includeLegacy = true) {
   const step = 1.8;
-  const columns = Math.floor((WALKABLE_BOUNDS.x2 - WALKABLE_BOUNDS.x1) / step) + 1;
-  const rows = Math.floor((WALKABLE_BOUNDS.y2 - WALKABLE_BOUNDS.y1) / step) + 1;
-  const toPoint = (column: number, row: number): WorldPoint => ({ x: WALKABLE_BOUNDS.x1 + column * step, y: WALKABLE_BOUNDS.y1 + row * step });
+  const columns = Math.floor((bounds.x2 - bounds.x1) / step) + 1;
+  const rows = Math.floor((bounds.y2 - bounds.y1) / step) + 1;
+  const toPoint = (column: number, row: number): WorldPoint => ({ x: bounds.x1 + column * step, y: bounds.y1 + row * step });
   const nearestCell = (point: WorldPoint) => ({
-    column: Math.max(0, Math.min(columns - 1, Math.round((point.x - WALKABLE_BOUNDS.x1) / step))),
-    row: Math.max(0, Math.min(rows - 1, Math.round((point.y - WALKABLE_BOUNDS.y1) / step))),
+    column: Math.max(0, Math.min(columns - 1, Math.round((point.x - bounds.x1) / step))),
+    row: Math.max(0, Math.min(rows - 1, Math.round((point.y - bounds.y1) / step))),
   });
   const requestedCell = nearestCell(requestedTarget);
   let targetCell = requestedCell;
-  if (pointBlocked(toPoint(targetCell.column, targetCell.row), dynamicZones)) {
+  if (pointBlocked(toPoint(targetCell.column, targetCell.row), dynamicZones, bounds, includeLegacy)) {
     let nearest: { column: number; row: number; distance: number } | null = null;
     for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
       const point = toPoint(column, row);
-      if (pointBlocked(point, dynamicZones)) continue;
+      if (pointBlocked(point, dynamicZones, bounds, includeLegacy)) continue;
       const distance = Math.hypot(column - requestedCell.column, row - requestedCell.row);
       if (!nearest || distance < nearest.distance) nearest = { column, row, distance };
     }
@@ -126,8 +131,8 @@ function findWalkPath(start: WorldPoint, requestedTarget: WorldPoint, dynamicZon
       const row = current.row + dy;
       if (column < 0 || column >= columns || row < 0 || row >= rows) continue;
       const point = toPoint(column, row);
-      if (pointBlocked(point, dynamicZones)) continue;
-      if (dx && dy && (pointBlocked(toPoint(current.column + dx, current.row), dynamicZones) || pointBlocked(toPoint(current.column, current.row + dy), dynamicZones))) continue;
+      if (pointBlocked(point, dynamicZones, bounds, includeLegacy)) continue;
+      if (dx && dy && (pointBlocked(toPoint(current.column + dx, current.row), dynamicZones, bounds, includeLegacy) || pointBlocked(toPoint(current.column, current.row + dy), dynamicZones, bounds, includeLegacy))) continue;
       const nextKey = key(column, row);
       const nextCost = (cost.get(currentKey) ?? 0) + (dx && dy ? 1.414 : 1);
       if (nextCost >= (cost.get(nextKey) ?? Infinity)) continue;
@@ -150,13 +155,13 @@ function findWalkPath(start: WorldPoint, requestedTarget: WorldPoint, dynamicZon
   while (anchor < candidates.length - 1) {
     let furthest = anchor + 1;
     for (let next = anchor + 2; next < candidates.length; next++) {
-      if (!segmentIsClear(candidates[anchor], candidates[next], dynamicZones)) break;
+      if (!segmentIsClear(candidates[anchor], candidates[next], dynamicZones, bounds, includeLegacy)) break;
       furthest = next;
     }
     route.push(candidates[furthest]);
     anchor = furthest;
   }
-  if (!pointBlocked(requestedTarget, dynamicZones) && segmentIsClear(route.at(-1) ?? start, requestedTarget, dynamicZones)) route.push(requestedTarget);
+  if (!pointBlocked(requestedTarget, dynamicZones, bounds, includeLegacy) && segmentIsClear(route.at(-1) ?? start, requestedTarget, dynamicZones, bounds, includeLegacy)) route.push(requestedTarget);
   return route;
 }
 
@@ -525,6 +530,8 @@ export default function Home() {
   const [enemyFacing, setEnemyFacing] = useState<"left" | "right">("right");
   const [enemyMoveDuration, setEnemyMoveDuration] = useState(1500);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: InteractionTarget } | null>(null);
+  const [worldProject, setWorldProject] = useState<GameProject | null>(null);
+  const [worldSource, setWorldSource] = useState<"github" | "bundled" | "offline">("offline");
   const [unlockedDoors, setUnlockedDoors] = useState<string[]>([]);
   const [interior, setInterior] = useState<string | null>(null);
   const [dialogueInput, setDialogueInput] = useState("");
@@ -572,6 +579,45 @@ export default function Home() {
   const resolvedQuestIds = useRef(new Set<string>());
   const playtimeOffset = useRef(0);
   const playtimeStartedAt = useRef(0);
+
+  const worldLevel = worldProject?.levels[0];
+  const activeWalkBounds = worldLevel ? { x1: 0, x2: worldLevel.width, y1: 0, y2: worldLevel.height } : WALKABLE_BOUNDS;
+  const authoredCollisionZones = useMemo<CollisionZone[]>(() => {
+    if (!worldProject || !worldLevel) return [];
+    return worldProject.levelObjects.filter((object) => object.levelId === worldLevel.id && object.collision.enabled && object.collision.solid).map((object) => object.collision.shape === "circle"
+      ? { kind: "ellipse", x: object.x + object.width / 2, y: object.y + object.height / 2, rx: object.width / 2, ry: object.height / 2, label: object.name }
+      : { kind: "rect", x1: object.x, x2: object.x + object.width, y1: object.y, y2: object.y + object.height, label: object.name });
+  }, [worldProject, worldLevel]);
+  const worldObjectCenter = (id: string, fallback: WorldPoint) => {
+    const object = worldProject?.levelObjects.find((entry) => entry.id === id);
+    return object ? { x: object.x + object.width / 2, y: object.y + object.height / 2 } : fallback;
+  };
+  const rowanPosition = worldObjectCenter("scene-rowan", { x: 38, y: 72 });
+
+  useEffect(() => {
+    let active = true;
+    const loadWorld = async () => {
+      try {
+        const response = await fetch("/api/game/world", { cache: "no-store" });
+        const payload = await response.json() as { project?: GameProject; source?: "github" | "bundled"; error?: string };
+        if (!response.ok || !payload.project) throw new Error(payload.error || "World data is unavailable.");
+        if (!active) return;
+        setWorldProject(payload.project); setWorldSource(payload.source || "github");
+        const firstLevel = payload.project.levels[0];
+        const courier = payload.project.levelObjects.find((entry) => entry.id === "scene-courier");
+        const squirrel = payload.project.levelObjects.find((entry) => entry.id === "scene-squirrel");
+        if (firstLevel) {
+          const spawn = courier ? { x: courier.x + courier.width / 2, y: courier.y + courier.height / 2 } : firstLevel.playerSpawn;
+          setPlayerPosition(spawn); setDestination(spawn); setLocation(`${firstLevel.region} — ${firstLevel.name}`);
+        }
+        if (squirrel) setEnemyPosition({ x: squirrel.x + squirrel.width / 2, y: squirrel.y + squirrel.height / 2 });
+      } catch { if (active) setWorldSource("offline"); }
+    };
+    void loadWorld();
+    const onFocus = () => void loadWorld();
+    window.addEventListener("focus", onFocus);
+    return () => { active = false; window.removeEventListener("focus", onFocus); };
+  }, []);
 
   const currentPlaytime = () => playtimeOffset.current + Math.max(0, Math.floor((Date.now() - playtimeStartedAt.current) / 1000));
 
@@ -904,15 +950,16 @@ export default function Home() {
     if (interior || combat === "enemy" || isSpinning) return;
     const bounds = sceneRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const x = Math.max(WALKABLE_BOUNDS.x1, Math.min(WALKABLE_BOUNDS.x2, ((event.clientX - bounds.left) / bounds.width) * 100));
-    const y = Math.max(WALKABLE_BOUNDS.y1, Math.min(WALKABLE_BOUNDS.y2, ((event.clientY - bounds.top) / bounds.height) * 100));
+    const x = Math.max(activeWalkBounds.x1, Math.min(activeWalkBounds.x2, ((event.clientX - bounds.left) / bounds.width) * (worldLevel?.width || 100)));
+    const y = Math.max(activeWalkBounds.y1, Math.min(activeWalkBounds.y2, ((event.clientY - bounds.top) / bounds.height) * (worldLevel?.height || 100)));
     const actorZones: CollisionZone[] = [
-      ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
+      ...authoredCollisionZones,
+      ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: rowanPosition.x, y: rowanPosition.y, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
       ...(enemyHp > 0 ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.35, ry: 1, label: "rabid squirrel" }] : []),
     ];
     const requested = { x, y };
-    const requestedBlocked = pointBlocked(requested, actorZones);
-    const route = findWalkPath(playerPosition, requested, actorZones);
+    const requestedBlocked = pointBlocked(requested, actorZones, activeWalkBounds, !worldProject);
+    const route = findWalkPath(playerPosition, requested, actorZones, activeWalkBounds, !worldProject);
     setContextMenu(null);
     if (!route.length) {
       addLog("No walkable route reaches that point.", "bad");
@@ -926,6 +973,21 @@ export default function Home() {
     event.preventDefault();
     event.stopPropagation();
     setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 285), y: Math.min(event.clientY, window.innerHeight - 220), target });
+  };
+
+  const openAuthoredObject = (event: React.MouseEvent, object: LevelObject, sprite?: SpriteAsset) => {
+    const lower = object.name.toLowerCase();
+    if (lower.includes("rowan")) return openInteraction(event, npcInteractions.rowan);
+    if (lower.includes("squirrel")) return openInteraction(event, npcInteractions.squirrel);
+    openInteraction(event, { id: object.id, label: object.name, kind: "prop", action: sprite?.category === "prop" || sprite?.tags.some((tag) => /loot|container|search/i.test(tag)) ? "search" : "inspect", authoredType: sprite?.category || "effect", tags: sprite?.tags || [], trigger: object.collision.trigger });
+  };
+
+  const openAuthoredDoor = (event: React.MouseEvent, cellId: string, doorId: string) => {
+    const cell = worldProject?.cells.find((entry) => entry.id === cellId);
+    const door = cell?.doors.find((entry) => entry.id === doorId);
+    if (!cell || !door) return;
+    const targetCell = worldProject?.cells.find((entry) => entry.id === door.targetCellId);
+    openInteraction(event, { id: door.id, label: door.name, kind: "door", locked: door.locked, lockpick: door.locked, interior: targetCell?.name || cell.name });
   };
 
   const selectNpc = (npcId: NpcId) => {
@@ -1388,10 +1450,11 @@ export default function Home() {
         const destinationPoint = anchors[action.target];
         if (!destinationPoint) return null;
         const actorZones: CollisionZone[] = [
-          ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: 38, y: 72, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
+          ...authoredCollisionZones,
+          ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: rowanPosition.x, y: rowanPosition.y, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
           ...(enemyHp > 0 ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.35, ry: 1, label: "rabid squirrel" }] : []),
         ];
-        const route = findWalkPath(playerPosition, destinationPoint, actorZones);
+        const route = findWalkPath(playerPosition, destinationPoint, actorZones, activeWalkBounds, !worldProject);
         if (!route.length) return "MOVE BLOCKED · no safe route";
         beginRoute(route);
         return `MOVED · ${action.target.replaceAll("_", " ")}`;
@@ -1665,7 +1728,7 @@ export default function Home() {
           {!interior ? <>
             <div className="syracuse-skyline"><i /><i /><i /><i /><i /><i /></div>
             <div className="scene-title downtown-title"><small>DISTRICT LOADED · CLICK GROUND TO WALK</small><strong>DOWNTOWN SYRACUSE</strong><span>CLINTON SQUARE ↔ ARMORY SQUARE · 0.3 MI COMPRESSED</span></div>
-            <div className="level-ground">
+            {worldProject && worldLevel ? <WorldScene project={worldProject} levelId={worldLevel.id} hideObjectIds={["scene-courier", "scene-rowan", "scene-squirrel"]} onObjectContextMenu={openAuthoredObject} onDoorClick={(event, cell, door) => openAuthoredDoor(event, cell.id, door.id)} onDoorContextMenu={(event, cell, door) => openAuthoredDoor(event, cell.id, door.id)} /> : <><div className="level-ground">
               <div className="road road-east-west"><span>W FAYETTE STREET</span></div>
               <div className="road road-north-south"><span>S SALINA STREET</span></div>
               <div className="sidewalk sidewalk-north"/><div className="sidewalk sidewalk-south"/>
@@ -1695,7 +1758,7 @@ export default function Home() {
             <button className="hotspot prop lamp-prop" onClick={(e) => openInteraction(e, interactions.lamp)} onContextMenu={(e) => openInteraction(e, interactions.lamp)} aria-label="Interact with street lamp"><LandmarkSprite row={0} col={1} label="Bent street lamp" /></button>
             <LandmarkSprite row={1} col={0} label="Scrap checkpoint barricade" className="city-prop barricade-prop" />
             <LandmarkSprite row={1} col={1} label="Dead tree planter" className="city-prop tree-prop" />
-            {cityDecor.map((decor, index) => <DecorSprite key={`${decor.className}-${index}`} {...decor} />)}
+            {cityDecor.map((decor, index) => <DecorSprite key={`${decor.className}-${index}`} {...decor} />)}</>}
 
             <div className="walk-destination" style={{ left: `${destination.x}%`, top: `${destination.y}%` }} />
             <div className={`downtown-player ${walking ? `walking ${movementMode}` : ""}`} data-facing={walkFacing} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
@@ -1713,7 +1776,7 @@ export default function Home() {
               row={2}
               col={npc.trust > 35 ? 3 : 0}
               label="Target Rowan Vale"
-              position={{ x: 38, y: 72 }}
+              position={rowanPosition}
               selected={selectedNpc === "rowan"}
               motion={combatTarget === "rowan" && combat !== "idle" ? "combat" : "idle"}
               onClick={(event) => { event.stopPropagation(); selectNpc("rowan"); }}
@@ -1734,9 +1797,9 @@ export default function Home() {
               onClick={(event) => { event.stopPropagation(); selectNpc("squirrel"); }}
               onContextMenu={(event) => openNpcInteraction(event, "squirrel")}
             />}
-            {rowanHp <= 0 && <button className={`corpse-actor corpse-actor-rowan${lootedCorpses.includes("rowan") ? " looted" : ""}`} style={{ left: "38%", top: "74%" }} onClick={(event) => openInteraction(event, corpseInteractions.rowan)} onContextMenu={(event) => openInteraction(event, corpseInteractions.rowan)} aria-label="Loot Rowan Vale's body"><CorpseSprite character="rowan" label="Rowan Vale lying dead" /><span>{lootedCorpses.includes("rowan") ? "SEARCHED" : "LOOT"}</span></button>}
+            {rowanHp <= 0 && <button className={`corpse-actor corpse-actor-rowan${lootedCorpses.includes("rowan") ? " looted" : ""}`} style={{ left: `${rowanPosition.x}%`, top: `${rowanPosition.y + 2}%` }} onClick={(event) => openInteraction(event, corpseInteractions.rowan)} onContextMenu={(event) => openInteraction(event, corpseInteractions.rowan)} aria-label="Loot Rowan Vale's body"><CorpseSprite character="rowan" label="Rowan Vale lying dead" /><span>{lootedCorpses.includes("rowan") ? "SEARCHED" : "LOOT"}</span></button>}
             {enemyHp <= 0 && <button className={`corpse-actor corpse-actor-squirrel${lootedCorpses.includes("squirrel") ? " looted" : ""}`} style={{ left: `${enemyPosition.x}%`, top: `${enemyPosition.y + 1}%` }} onClick={(event) => openInteraction(event, corpseInteractions.squirrel)} onContextMenu={(event) => openInteraction(event, corpseInteractions.squirrel)} aria-label="Loot rabid squirrel corpse"><CorpseSprite character="squirrel" label="Rabid squirrel lying dead" /><span>{lootedCorpses.includes("squirrel") ? "SEARCHED" : "LOOT"}</span></button>}
-            <div className="control-hint"><b>LEFT CLICK</b> WALK / TARGET NPC <i>•</i> <b>RIGHT CLICK</b> TALK / INTERACT</div>
+            <div className="control-hint"><b>LEFT CLICK</b> WALK / TARGET NPC <i>•</i> <b>RIGHT CLICK</b> TYPE-AWARE ACTIONS <i>•</i> <b>WORLD</b> {worldSource === "github" ? "TESTING SYNCED" : worldSource === "bundled" ? "BUNDLED FALLBACK" : "OFFLINE FALLBACK"}</div>
           </> : <div className="interior-scene">
             <div className="interior-wall left-wall" /><div className="interior-wall right-wall" />
             <EnvSprite row={0} col={3} label="Interior brick floor" className="interior-floor" />
@@ -1759,7 +1822,11 @@ export default function Home() {
             </> : contextMenu.target.kind === "corpse" ? <>
               <button onClick={() => contextMenu.target.corpseId && lootCorpse(contextMenu.target.corpseId)} disabled={!contextMenu.target.corpseId || lootedCorpses.includes(contextMenu.target.corpseId)}><b>▦</b><span>{contextMenu.target.corpseId && lootedCorpses.includes(contextMenu.target.corpseId) ? "SEARCHED" : "LOOT"}<small>Transfer carried items to pack</small></span></button>
               <button onClick={() => { addLog(contextMenu.target.corpseId === "rowan" ? "Rowan Vale is dead. Her body will remain where she fell." : "The rabid animal is dead. Its body will remain in Armory Alley."); setContextMenu(null); }}><b>?</b><span>EXAMINE<small>Inspect remains</small></span></button>
-            </> : <button onClick={() => interactWithProp(contextMenu.target)}><b>⌕</b><span>{contextMenu.target.action === "search" ? "SEARCH" : "INSPECT"}<small>Interact with object</small></span></button>}
+            </> : <>
+              {(contextMenu.target.action === "search" || contextMenu.target.tags?.some((tag) => /loot|container|search/i.test(tag))) && <button onClick={() => interactWithProp({ ...contextMenu.target, action: "search" })}><b>⌕</b><span>SEARCH<small>Check this {contextMenu.target.authoredType || "object"} for usable items</small></span></button>}
+              {contextMenu.target.trigger && <button onClick={() => { addLog(`${contextMenu.target.label}: trigger activated.`); setContextMenu(null); }}><b>◆</b><span>ACTIVATE<small>Run the authored world trigger</small></span></button>}
+              <button onClick={() => interactWithProp({ ...contextMenu.target, action: "inspect" })}><b>?</b><span>EXAMINE<small>Inspect {contextMenu.target.authoredType || "object"} properties</small></span></button>
+            </>}
           </div>}
           {combat === "won" && <div className="victory-stamp">{combatTarget === "rowan" ? "ROWAN DEFEATED" : "ARMORY ALLEY CLEARED"} <span>{combatTarget === "rowan" ? "+40 XP" : "+65 XP"}</span></div>}
         </section>

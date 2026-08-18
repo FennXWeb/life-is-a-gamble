@@ -1,46 +1,9 @@
 import { createDefaultProject } from "../../../editor/default-project";
 import { requireEditorAdmin } from "../../../editor/admin";
 import { getGitHubMountConfig, getGitHubMountTarget, githubError, readRepositoryFile, writeRepositoryFile } from "../../../editor/github-mount";
-import type { GameProject } from "../../../editor/project-types";
-import { builtInSprites, builtInSyracuseScene } from "../../../editor/builtin-sprites";
+import { upgradeProject, validateProject } from "../../../editor/project-service";
 
 export const dynamic = "force-dynamic";
-
-function validateProject(value: unknown): value is GameProject {
-  if (!value || typeof value !== "object") return false;
-  const project = value as Partial<GameProject>;
-  const collections = [project.levels, project.cells, project.lootTables, project.npcs, project.spawners, project.quests];
-  if (project.schemaVersion !== 1 || project.game !== "Life is a Gamble" || collections.some((entry) => !Array.isArray(entry))) return false;
-  const extendedCollections = [project.spriteAssets, project.levelLayers, project.levelObjects].filter((entry) => entry !== undefined);
-  if (extendedCollections.some((entry) => !Array.isArray(entry))) return false;
-  const allIds = [...collections, ...extendedCollections].flatMap((collection) => (collection || []).map((entry) => (entry as { id?: string }).id));
-  return allIds.every((id) => typeof id === "string" && id.length > 0 && id.length <= 100);
-}
-
-function upgradeProject(project: GameProject): GameProject {
-  project.spriteAssets ||= [];
-  project.levelLayers ||= [];
-  project.levelObjects ||= [];
-  for (const level of project.levels) {
-    if (!project.levelLayers.some((layer) => layer.levelId === level.id)) {
-      project.levelLayers.push(
-        { id: `${level.id}-terrain`, levelId: level.id, name: "Terrain", kind: "terrain", visible: true, locked: false, opacity: 1 },
-        { id: `${level.id}-objects`, levelId: level.id, name: "Objects", kind: "objects", visible: true, locked: false, opacity: 1 },
-        { id: `${level.id}-collision`, levelId: level.id, name: "Collision", kind: "collision", visible: true, locked: false, opacity: 0.65 },
-        { id: `${level.id}-entities`, levelId: level.id, name: "Entities", kind: "entities", visible: true, locked: false, opacity: 1 },
-      );
-    }
-    if (level.id === "syracuse-salt-yard" && !project.levelObjects.some((object) => object.levelId === level.id)) {
-      const levelLayers = project.levelLayers.filter((layer) => layer.levelId === level.id);
-      const objectLayer = levelLayers.find((layer) => layer.kind === "objects") || levelLayers[0];
-      const entityLayer = levelLayers.find((layer) => layer.kind === "entities") || objectLayer;
-      if (objectLayer && entityLayer) project.levelObjects.push(...builtInSyracuseScene(objectLayer.id, entityLayer.id));
-    }
-  }
-  const knownSpriteIds = new Set(project.spriteAssets.map((asset) => asset.id));
-  project.spriteAssets.push(...builtInSprites().filter((asset) => !knownSpriteIds.has(asset.id)));
-  return project;
-}
 
 export async function GET() {
   const auth = await requireEditorAdmin();
