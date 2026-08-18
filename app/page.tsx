@@ -813,6 +813,18 @@ export default function Home() {
   }, [mainMenu, combat, panel, interior, audio.setMusic]);
 
   useEffect(() => {
+    if (!mainMenu) return;
+    const beginMenuMusic = () => { void audio.activate("menu"); };
+    beginMenuMusic();
+    window.addEventListener("pointerdown", beginMenuMusic, { once: true });
+    window.addEventListener("keydown", beginMenuMusic, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", beginMenuMusic);
+      window.removeEventListener("keydown", beginMenuMusic);
+    };
+  }, [mainMenu, audio.activate]);
+
+  useEffect(() => {
     if (mainMenu || interior || enemyHp <= 0 || combat !== "idle") {
       return;
     }

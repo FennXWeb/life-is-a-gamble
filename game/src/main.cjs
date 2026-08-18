@@ -4,6 +4,8 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { createGameServer } = require("./server.cjs");
 
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
 const SAVE_KEY = "life-is-a-gamble-save";
 const SAVE_SLOTS_KEY = "life-is-a-gamble-save-slots";
 let gameWindow = null;

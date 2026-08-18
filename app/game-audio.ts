@@ -104,7 +104,15 @@ export function useGameAudio() {
       context.current = ctx; sfxBus.current = sfx;
       setReady(true);
     }
-    await context.current.resume();
+    if (context.current.state !== "running") void context.current.resume().catch(() => undefined);
+    const currentTrack = musicElement.current;
+    if (playingMode.current === nextMode && currentTrack) {
+      if (musicOnRef.current && currentTrack.paused) {
+        try { await currentTrack.play(); }
+        catch { setMusicStatus(`${nextMode.toUpperCase()} ready · interact to begin`); }
+      }
+      return;
+    }
     await startMusic(nextMode);
   }, [startMusic]);
 

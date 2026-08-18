@@ -5,9 +5,12 @@
 .roadHorizontal::after { content: "W FAYETTE STREET"; position: absolute; left: 46%; top: 52%; color: #b9aa7088; font: 700 8px monospace; letter-spacing: .14em; }
 .roadVertical { position: absolute; top: 41%; bottom: 0; left: 45%; width: 16%; background: #292d2b; border-inline: 3px solid #77715a; box-shadow: inset 0 0 0 9px #393b35; }
 .plaza { position: absolute; left: 15%; top: 44%; width: 24%; height: 14%; border: 2px solid #85765a; background: repeating-linear-gradient(45deg,#675d49 0 6px,#5d5545 6px 12px); }
-.object { position: absolute; margin: 0; padding: 0; border: 1px solid transparent; overflow: hidden; transform-origin: center; background: transparent; color: #e3eeea; pointer-events: auto; }
+.object { position: absolute; margin: 0; padding: 0; border: 0; outline: 0; appearance: none; overflow: visible; transform-origin: center; background: transparent; box-shadow: none; color: #e3eeea; pointer-events: auto; }
 .object img,.frame { display: block; width: 100%; height: 100%; object-fit: fill; background-repeat: no-repeat; pointer-events: none; }
 .object span:not(.frame) { display: grid; place-items: center; width: 100%; height: 100%; font: 700 7px monospace; }
-.object:hover,.selected { border-color: #f4d178; box-shadow: 0 0 0 1px #000,0 0 0 2px #f4d178; }
+.object:hover,.selected { border: 0; outline: 0; box-shadow: none; }
+.object:hover img,.object:hover .frame,.selected img,.selected .frame { filter: brightness(1.07) drop-shadow(0 0 4px #f4d17866); }
+.object[data-sprite-category="structure"] img { background: transparent; filter: none; }
+.object[data-sprite-category="structure"]:hover img,.object[data-sprite-category="structure"].selected img { filter: brightness(1.035); }
 .collision { border-color: #e16450aa; background: repeating-linear-gradient(135deg,#d7594238 0 5px,#742a2544 5px 10px)!important; }
 .door { position: absolute; z-index: 90; min-width: 12px; min-height: 12px; padding: 0; border: 1px solid #e8af55; background: #302313dd; color: #ffd287; font: 900 9px monospace; pointer-events: auto; }

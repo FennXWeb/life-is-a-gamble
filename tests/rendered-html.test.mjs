@@ -71,9 +71,11 @@ test("keeps portraits, demographic voices, scaled decor, and jackpot feedback wi
 });
 
 test("uses authored storefront and Syracuse landmark sprites without losing door interactions", async () => {
-  const [page, css] = await Promise.all([
+  const [page, css, worldCss, nativeRuntime] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/world/world-scene.module.css", import.meta.url), "utf8"),
+    readFile(new URL("../game/src/main.cjs", import.meta.url), "utf8"),
   ]);
   const assets = [
     "../public/landmarks/erie-canal-museum.png",
@@ -87,7 +89,11 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
 
   await Promise.all(assets.map((asset) => access(new URL(asset, import.meta.url))));
   assert.match(page, /building-facade-art/);
-  assert.doesNotMatch(page, /await audio\.activate\("menu"\)/);
+  assert.match(page, /beginMenuMusic/);
+  assert.match(page, /audio\.activate\("menu"\)/);
+  assert.match(nativeRuntime, /autoplay-policy", "no-user-gesture-required/);
+  assert.match(worldCss, /appearance: none/);
+  assert.match(worldCss, /data-sprite-category="structure"/);
   assert.match(page, /facade-door-hitbox/);
   assert.match(page, /facade-door-/);
   assert.match(page, /facade=\{\{ kind: "landmark", id: "syracuse-city-hall" \}\}/);
@@ -98,6 +104,8 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
   assert.match(css, /\.building-facade-art\.facade-landmark-theatre\{background-size:114% 100%/);
   assert.match(css, /\.streetwall-row \.has-facade \.building-cell \.building-tile/);
   assert.match(css, /\.facade-door-syracuse-city-hall/);
+  assert.match(css, /\.player-weapon-sprite\{[^}]*width:90px;height:150px/);
+  assert.match(css, /saturate\(\.76\) brightness\(\.88\)/);
 });
 
 test("dead characters leave persistent lootable corpses and live dialogue uses the default microphone", async () => {

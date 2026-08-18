@@ -575,7 +575,7 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .downtown-player,.downtown-rowan,.downtown-squirrel,.npc-actor,.corpse-actor,.hotspot.prop,.landmark-sprite.city-prop{overflow:visible}
 
 /* Holster-driven combat visuals. The generated atlas is a padded 5x2 transparent grid. */
-.player-weapon-sprite{--weapon-facing:1;position:absolute;z-index:3;left:-14px;top:-39px;width:116px;height:148px;background-image:url('/player-weapon-atlas-v1.png');background-size:500% 200%;background-repeat:no-repeat;background-color:transparent;filter:drop-shadow(0 12px 8px #0009) saturate(.9) contrast(1.05);transform:scaleX(var(--weapon-facing));transform-origin:50% 88%;pointer-events:none}
+.player-weapon-sprite{--weapon-facing:1;position:absolute;z-index:3;left:-1px;top:-32px;width:90px;height:150px;background-image:url('/player-weapon-atlas-v1.png');background-size:500% 200%;background-repeat:no-repeat;background-color:transparent;filter:drop-shadow(0 12px 8px #0009) saturate(.76) brightness(.88) contrast(1.1) hue-rotate(-4deg);transform:scaleX(var(--weapon-facing));transform-origin:50% 88%;pointer-events:none}
 .downtown-player[data-facing="left"] .player-weapon-sprite{--weapon-facing:-1}
 .downtown-player.weapon-firing .player-weapon-sprite{animation:playerWeaponRecoil .28s cubic-bezier(.2,.8,.2,1)}
 .ballistic-fx{position:absolute;z-index:8;left:71px;top:30px;width:170px;height:22px;transform-origin:left center;pointer-events:none;filter:drop-shadow(0 0 6px #ffb63d)}
