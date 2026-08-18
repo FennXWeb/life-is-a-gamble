@@ -6,6 +6,7 @@ on:
     paths:
       - "app/**"
       - "game/**"
+      - "game-data/**"
       - "launcher/**"
       - "public/**"
       - "package.json"

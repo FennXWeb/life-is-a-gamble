@@ -20,6 +20,13 @@ test("desktop runtime serves the built game and its static assets", async () => 
 
     const manifest = await fetch(`${runtime.origin}/manifest.json`);
     assert.ok([200, 404].includes(manifest.status));
+
+    const world = await fetch(`${runtime.origin}/api/game/world`);
+    assert.equal(world.status, 200);
+    const worldPayload = await world.json();
+    assert.equal(worldPayload.source, "bundled");
+    assert.equal(worldPayload.project.game, "Life is a Gamble");
+    assert.ok(worldPayload.project.levelObjects.length > 0);
   } finally {
     await runtime.close();
   }

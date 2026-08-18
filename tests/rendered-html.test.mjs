@@ -49,6 +49,36 @@ test("server-renders the Life is a Gamble game shell", async () => {
   assert.doesNotMatch(html, /codex-preview|Building your site/);
 });
 
+test("desktop world data is bundled, aspect-safe, and editor publishes trigger testing releases", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("world-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/game/world"),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.source, "bundled");
+  assert.equal(payload.project.game, "Life is a Gamble");
+  assert.ok(payload.project.levelObjects.length > 0);
+
+  const [page, world, worldCss, workflow] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/world/world-scene.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/world/world-scene.module.css", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/launcher-release.yml", import.meta.url), "utf8"),
+  ]);
+  assert.match(world, /--world-aspect/);
+  assert.match(worldCss, /container-type: size/);
+  assert.match(worldCss, /width: min\(100cqw, calc\(100cqh \* var\(--world-aspect\)\)\)/);
+  assert.match(page, /worldToScenePoint/);
+  assert.match(page, /sceneX < worldViewport\.left/);
+  assert.match(page, /BUNDLED RELEASE/);
+  assert.match(workflow, /- "game-data\/\*\*"/);
+});
+
 test("keeps portraits, demographic voices, scaled decor, and jackpot feedback wired", async () => {
   const [page, css, speech, audio] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),

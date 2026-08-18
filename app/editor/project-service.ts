@@ -1,7 +1,7 @@
-import { createDefaultProject } from "./default-project";
 import { builtInSprites, builtInSyracuseScene } from "./builtin-sprites";
 import { getGitHubMountConfig, githubError, readRepositoryFile } from "./github-mount";
 import type { GameProject } from "./project-types";
+import bundledProjectDocument from "../../game-data/editor-project.json";
 
 export function validateProject(value: unknown): value is GameProject {
   if (!value || typeof value !== "object") return false;
@@ -38,9 +38,15 @@ export function upgradeProject(project: GameProject): GameProject {
   return project;
 }
 
+export function loadBundledProject(): GameProject {
+  const project = structuredClone(bundledProjectDocument) as GameProject;
+  if (!validateProject(project)) throw new Error("The bundled game-data file does not match LIAG Editor schema version 1.");
+  return upgradeProject(project);
+}
+
 export async function loadMountedProject() {
   const config = getGitHubMountConfig();
-  if (!config) return { project: createDefaultProject(), source: "bundled" as const, branch: "testing" };
+  if (!config) return { project: loadBundledProject(), source: "bundled" as const, branch: "testing" };
   try {
     const file = await readRepositoryFile(config, config.dataPath);
     const parsed = JSON.parse(file.content) as unknown;
@@ -48,7 +54,7 @@ export async function loadMountedProject() {
     return { project: upgradeProject(parsed), source: "github" as const, branch: config.branch, sha: file.sha };
   } catch (error) {
     const issue = githubError(error);
-    if (issue.status === 404) return { project: createDefaultProject(), source: "bundled" as const, branch: config.branch };
+    if (issue.status === 404) return { project: loadBundledProject(), source: "bundled" as const, branch: config.branch };
     throw error;
   }
 }

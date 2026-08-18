@@ -1,4 +1,5 @@
-.world { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.world { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; pointer-events: none; container-type: size; background: #11130f; }
+.plane { position: relative; width: min(100cqw, calc(100cqh * var(--world-aspect))); height: min(100cqh, calc(100cqw / var(--world-aspect))); overflow: hidden; }
 .ground { position: absolute; inset: 0; background: linear-gradient(#6d6047 0 42%, #393a32 43% 100%); }
 .ground::before { content: ""; position: absolute; inset: 38% 0 0; background: repeating-linear-gradient(82deg, transparent 0 48px, #15181335 49px 50px); }
 .roadHorizontal { position: absolute; left: 0; right: 0; top: 55%; height: 31%; background: #292d2b; border-block: 3px solid #77715a; box-shadow: inset 0 0 0 12px #393b35; }

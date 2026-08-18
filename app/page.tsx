@@ -57,6 +57,7 @@ type SpeechRecognitionController = {
 };
 
 type WorldPoint = { x: number; y: number };
+type WorldViewport = { left: number; top: number; width: number; height: number };
 type WeaponType = "unarmed" | "pistol" | "rifle" | "shotgun" | "melee";
 type HolsterSlot = "holster-left" | "holster-right";
 type CollisionZone =
@@ -563,6 +564,7 @@ export default function Home() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: InteractionTarget } | null>(null);
   const [worldProject, setWorldProject] = useState<GameProject | null>(null);
   const [worldSource, setWorldSource] = useState<"github" | "bundled" | "offline">("offline");
+  const [worldViewport, setWorldViewport] = useState<WorldViewport>({ left: 0, top: 0, width: 100, height: 100 });
   const [unlockedDoors, setUnlockedDoors] = useState<string[]>([]);
   const [interior, setInterior] = useState<string | null>(null);
   const [dialogueInput, setDialogueInput] = useState("");
@@ -623,6 +625,10 @@ export default function Home() {
       ? { kind: "ellipse", x: object.x + object.width / 2, y: object.y + object.height / 2, rx: object.width / 2, ry: object.height / 2, label: object.name }
       : { kind: "rect", x1: object.x, x2: object.x + object.width, y1: object.y, y2: object.y + object.height, label: object.name });
   }, [worldProject, worldLevel]);
+  const worldToScenePoint = (point: WorldPoint): WorldPoint => worldLevel ? {
+    x: worldViewport.left + point.x / worldLevel.width * worldViewport.width,
+    y: worldViewport.top + point.y / worldLevel.height * worldViewport.height,
+  } : point;
   useEffect(() => {
     let active = true;
     const loadWorld = async () => {
@@ -649,6 +655,31 @@ export default function Home() {
     window.addEventListener("focus", onFocus);
     return () => { active = false; window.removeEventListener("focus", onFocus); };
   }, []);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !worldLevel) {
+      setWorldViewport({ left: 0, top: 0, width: 100, height: 100 });
+      return;
+    }
+    const updateViewport = () => {
+      const bounds = scene.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      const aspect = worldLevel.width / worldLevel.height;
+      const planeWidth = Math.min(bounds.width, bounds.height * aspect);
+      const planeHeight = planeWidth / aspect;
+      setWorldViewport({
+        left: (bounds.width - planeWidth) / 2 / bounds.width * 100,
+        top: (bounds.height - planeHeight) / 2 / bounds.height * 100,
+        width: planeWidth / bounds.width * 100,
+        height: planeHeight / bounds.height * 100,
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(scene);
+    return () => observer.disconnect();
+  }, [worldLevel]);
 
   const currentPlaytime = () => playtimeOffset.current + Math.max(0, Math.floor((Date.now() - playtimeStartedAt.current) / 1000));
 
@@ -1021,8 +1052,11 @@ export default function Home() {
     if (interior || combat === "enemy" || isSpinning) return;
     const bounds = sceneRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const x = Math.max(activeWalkBounds.x1, Math.min(activeWalkBounds.x2, ((event.clientX - bounds.left) / bounds.width) * (worldLevel?.width || 100)));
-    const y = Math.max(activeWalkBounds.y1, Math.min(activeWalkBounds.y2, ((event.clientY - bounds.top) / bounds.height) * (worldLevel?.height || 100)));
+    const sceneX = (event.clientX - bounds.left) / bounds.width * 100;
+    const sceneY = (event.clientY - bounds.top) / bounds.height * 100;
+    if (worldLevel && (sceneX < worldViewport.left || sceneX > worldViewport.left + worldViewport.width || sceneY < worldViewport.top || sceneY > worldViewport.top + worldViewport.height)) return;
+    const x = Math.max(activeWalkBounds.x1, Math.min(activeWalkBounds.x2, worldLevel ? (sceneX - worldViewport.left) / worldViewport.width * worldLevel.width : sceneX));
+    const y = Math.max(activeWalkBounds.y1, Math.min(activeWalkBounds.y2, worldLevel ? (sceneY - worldViewport.top) / worldViewport.height * worldLevel.height : sceneY));
     const actorZones: CollisionZone[] = [
       ...authoredCollisionZones,
       ...(rowanHp > 0 ? [{ kind: "ellipse" as const, x: rowanPosition.x, y: rowanPosition.y, rx: 1.5, ry: 1.1, label: "Rowan" }] : []),
@@ -1916,7 +1950,7 @@ export default function Home() {
           {!interior ? <>
             <div className="syracuse-skyline"><i /><i /><i /><i /><i /><i /></div>
             <div className="scene-title downtown-title"><small>DISTRICT LOADED · CLICK GROUND TO WALK</small><strong>DOWNTOWN SYRACUSE</strong><span>CLINTON SQUARE ↔ ARMORY SQUARE · 0.3 MI COMPRESSED</span></div>
-            {worldProject && worldLevel ? <WorldScene project={worldProject} levelId={worldLevel.id} hideObjectIds={["scene-courier", "scene-rowan", "scene-squirrel"]} onObjectContextMenu={openAuthoredObject} onDoorClick={(event, cell, door) => openAuthoredDoor(event, cell.id, door.id)} onDoorContextMenu={(event, cell, door) => openAuthoredDoor(event, cell.id, door.id)} /> : <><div className="level-ground">
+            {worldProject && worldLevel ? <WorldScene project={worldProject} levelId={worldLevel.id} assetEndpoint={worldSource === "github" ? "/api/game/assets" : ""} hideObjectIds={["scene-courier", "scene-rowan", "scene-squirrel"]} onObjectContextMenu={openAuthoredObject} onDoorClick={(event, cell, door) => openAuthoredDoor(event, cell.id, door.id)} onDoorContextMenu={(event, cell, door) => openAuthoredDoor(event, cell.id, door.id)} /> : <><div className="level-ground">
               <div className="road road-east-west"><span>W FAYETTE STREET</span></div>
               <div className="road road-north-south"><span>S SALINA STREET</span></div>
               <div className="sidewalk sidewalk-north"/><div className="sidewalk sidewalk-south"/>
@@ -1948,8 +1982,8 @@ export default function Home() {
             <LandmarkSprite row={1} col={1} label="Dead tree planter" className="city-prop tree-prop" />
             {cityDecor.map((decor, index) => <DecorSprite key={`${decor.className}-${index}`} {...decor} />)}</>}
 
-            <div className="walk-destination" style={{ left: `${destination.x}%`, top: `${destination.y}%` }} />
-            <div className={`downtown-player weapon-${activeWeaponType}${walking ? ` walking ${movementMode}` : ""}${weaponFiring ? " weapon-firing" : ""}`} data-facing={walkFacing} data-weapon={activeWeaponType} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
+            <div className="walk-destination" style={{ left: `${worldToScenePoint(destination).x}%`, top: `${worldToScenePoint(destination).y}%` }} />
+            <div className={`downtown-player weapon-${activeWeaponType}${walking ? ` walking ${movementMode}` : ""}${weaponFiring ? " weapon-firing" : ""}`} data-facing={walkFacing} data-weapon={activeWeaponType} style={{ left: `${worldToScenePoint(playerPosition).x}%`, top: `${worldToScenePoint(playerPosition).y}%`, transitionDuration: `${walkDuration}ms` }}>
               <div className="status-tag you">YOU {walking ? `· ${movementMode === "run" ? "RUNNING" : "WALKING"}` : "· READY"}</div>
               {walking
                 ? <CourierMotionSprite mode={movementMode} frame={walkFrame} label={`Courier ${movementMode} in downtown Syracuse`} />
@@ -1965,7 +1999,7 @@ export default function Home() {
               row={2}
               col={npc.trust > 35 ? 3 : 0}
               label="Target Rowan Vale"
-              position={rowanPosition}
+              position={worldToScenePoint(rowanPosition)}
               selected={selectedNpc === "rowan"}
               motion={combatTarget === "rowan" && combat === "enemy" && enemyTactic === "FIRING" ? "attack" : rowanMoving ? "patrol" : combatTarget === "rowan" && combat !== "idle" ? "combat" : "idle"}
               facing={rowanFacing}
@@ -1982,15 +2016,15 @@ export default function Home() {
               label="Target rabid squirrel"
               motion={combatTarget === "squirrel" && combat === "enemy" && enemyTactic === "LUNGING" ? "attack" : enemyMoving ? "patrol" : combatTarget === "squirrel" && combat !== "idle" ? "combat" : "idle"}
               facing={enemyFacing}
-              position={enemyPosition}
+              position={worldToScenePoint(enemyPosition)}
               transitionMs={enemyMoveDuration}
               selected={selectedNpc === "squirrel"}
               onClick={(event) => { event.stopPropagation(); selectNpc("squirrel"); }}
               onContextMenu={(event) => openNpcInteraction(event, "squirrel")}
             />}
-            {rowanHp <= 0 && <button className={`corpse-actor corpse-actor-rowan${lootedCorpses.includes("rowan") ? " looted" : ""}`} style={{ left: `${rowanPosition.x}%`, top: `${rowanPosition.y + 2}%` }} onClick={(event) => openInteraction(event, corpseInteractions.rowan)} onContextMenu={(event) => openInteraction(event, corpseInteractions.rowan)} aria-label="Loot Rowan Vale's body"><CorpseSprite character="rowan" label="Rowan Vale lying dead" /><span>{lootedCorpses.includes("rowan") ? "SEARCHED" : "LOOT"}</span></button>}
-            {enemyHp <= 0 && <button className={`corpse-actor corpse-actor-squirrel${lootedCorpses.includes("squirrel") ? " looted" : ""}`} style={{ left: `${enemyPosition.x}%`, top: `${enemyPosition.y + 1}%` }} onClick={(event) => openInteraction(event, corpseInteractions.squirrel)} onContextMenu={(event) => openInteraction(event, corpseInteractions.squirrel)} aria-label="Loot rabid squirrel corpse"><CorpseSprite character="squirrel" label="Rabid squirrel lying dead" /><span>{lootedCorpses.includes("squirrel") ? "SEARCHED" : "LOOT"}</span></button>}
-            <div className="control-hint"><b>LEFT CLICK</b> WALK / TARGET NPC <i>•</i> <b>RIGHT CLICK</b> TYPE-AWARE ACTIONS <i>•</i> <b>WORLD</b> {worldSource === "github" ? "TESTING SYNCED" : worldSource === "bundled" ? "BUNDLED FALLBACK" : "OFFLINE FALLBACK"}</div>
+            {rowanHp <= 0 && <button className={`corpse-actor corpse-actor-rowan${lootedCorpses.includes("rowan") ? " looted" : ""}`} style={{ left: `${worldToScenePoint({ x: rowanPosition.x, y: rowanPosition.y + 2 }).x}%`, top: `${worldToScenePoint({ x: rowanPosition.x, y: rowanPosition.y + 2 }).y}%` }} onClick={(event) => openInteraction(event, corpseInteractions.rowan)} onContextMenu={(event) => openInteraction(event, corpseInteractions.rowan)} aria-label="Loot Rowan Vale's body"><CorpseSprite character="rowan" label="Rowan Vale lying dead" /><span>{lootedCorpses.includes("rowan") ? "SEARCHED" : "LOOT"}</span></button>}
+            {enemyHp <= 0 && <button className={`corpse-actor corpse-actor-squirrel${lootedCorpses.includes("squirrel") ? " looted" : ""}`} style={{ left: `${worldToScenePoint({ x: enemyPosition.x, y: enemyPosition.y + 1 }).x}%`, top: `${worldToScenePoint({ x: enemyPosition.x, y: enemyPosition.y + 1 }).y}%` }} onClick={(event) => openInteraction(event, corpseInteractions.squirrel)} onContextMenu={(event) => openInteraction(event, corpseInteractions.squirrel)} aria-label="Loot rabid squirrel corpse"><CorpseSprite character="squirrel" label="Rabid squirrel lying dead" /><span>{lootedCorpses.includes("squirrel") ? "SEARCHED" : "LOOT"}</span></button>}
+            <div className="control-hint"><b>LEFT CLICK</b> WALK / TARGET NPC <i>•</i> <b>RIGHT CLICK</b> TYPE-AWARE ACTIONS <i>•</i> <b>WORLD</b> {worldSource === "github" ? "TESTING SYNCED" : worldSource === "bundled" ? "BUNDLED RELEASE" : "OFFLINE FALLBACK"}</div>
           </> : <div className="interior-scene">
             <div className="interior-wall left-wall" /><div className="interior-wall right-wall" />
             <EnvSprite row={0} col={3} label="Interior brick floor" className="interior-floor" />
