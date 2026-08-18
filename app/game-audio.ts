@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type GameSfx = "ui" | "door" | "lockpick" | "lockBreak" | "loot" | "shoot" | "enemyNormal" | "enemyDamaged" | "enemyAttack" | "enemyAggro" | "equip" | "slotSpin" | "slotWin" | "slotLose" | "slotJackpot";
+export type GameSfx = "ui" | "door" | "lockpick" | "lockBreak" | "loot" | "shoot" | "shootPistol" | "shootRifle" | "shootShotgun" | "enemyNormal" | "enemyDamaged" | "enemyAttack" | "enemyAggro" | "equip" | "slotSpin" | "slotWin" | "slotLose" | "slotJackpot";
 export type MusicMode = "menu" | "ambient" | "combat" | "dialogue" | "interior";
 type MusicManifest = { tracks: Record<MusicMode, string[]> };
 
@@ -147,7 +147,26 @@ export function useGameAudio() {
     if (sound === "lockpick") { sweep(1500, 980, 0.09, 0.065, "triangle"); sweep(2100, 1250, 0.06, 0.035, "square", 0.11); }
     if (sound === "lockBreak") { sweep(2400, 310, 0.2, 0.12, "square"); noiseBurst(ctx, bus, 0.16, 0.11, 2600); }
     if (sound === "loot") { sweep(560, 920, 0.16, 0.07, "triangle"); sweep(780, 1240, 0.18, 0.055, "sine", 0.11); }
-    if (sound === "shoot") { noiseBurst(ctx, bus, 0.2, 0.5, 4200); sweep(115, 44, 0.28, 0.24, "square"); }
+    if (sound === "shoot" || sound === "shootPistol") {
+      noiseBurst(ctx, bus, 0.13, 0.58, 6200);
+      noiseBurst(ctx, bus, 0.24, 0.16, 1500, .025);
+      sweep(185, 58, 0.22, 0.25, "square");
+      sweep(940, 310, 0.07, 0.07, "triangle", .018);
+    }
+    if (sound === "shootRifle") {
+      noiseBurst(ctx, bus, 0.11, 0.7, 7600);
+      noiseBurst(ctx, bus, 0.34, 0.2, 2100, .018);
+      sweep(255, 52, 0.3, 0.29, "sawtooth");
+      sweep(1380, 480, 0.055, 0.09, "square", .012);
+      noiseBurst(ctx, bus, .16, .08, 3200, .2);
+    }
+    if (sound === "shootShotgun") {
+      noiseBurst(ctx, bus, 0.22, 0.88, 4800);
+      noiseBurst(ctx, bus, 0.48, 0.34, 900, .018);
+      sweep(125, 34, 0.46, 0.42, "sawtooth");
+      sweep(72, 28, 0.38, 0.26, "square", .045);
+      noiseBurst(ctx, bus, .24, .1, 1800, .3);
+    }
     if (sound === "enemyNormal") sweep(175, 130, 0.26, 0.08, "sawtooth");
     if (sound === "enemyDamaged") { sweep(390, 105, 0.32, 0.16, "sawtooth"); noiseBurst(ctx, bus, 0.13, 0.08, 1600); }
     if (sound === "enemyAttack") { sweep(145, 260, 0.24, 0.15, "sawtooth"); noiseBurst(ctx, bus, 0.12, 0.1, 1900); }

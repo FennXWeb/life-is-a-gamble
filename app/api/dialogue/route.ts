@@ -27,7 +27,7 @@ const combatStates = new Set(["idle", "player", "won"]);
 const grantableItemKeys = new Set(["rowan-map", "chicory-flask", "field-bandage", "scrapshot-box", "spare-lockpick"]);
 const inventoryItemKeys = new Set([
   "pipe-pistol", "road-coat", "dried-apples", "bent-lockpick", "old-chips", "squirrel-tail",
-  "welding-hood", "work-gloves", "road-boots", "canvas-trousers", "scrap-knife",
+  "welding-hood", "work-gloves", "road-boots", "canvas-trousers", "scrap-knife", "service-rifle", "coach-shotgun", "rowans-revolver",
   ...grantableItemKeys,
 ]);
 const equipmentSlots = new Set(["head", "torso", "legs", "hands", "feet", "holster-left", "holster-right"]);

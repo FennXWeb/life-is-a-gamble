@@ -573,3 +573,21 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .landmark-sprite::before{inset:3% 4% 5%;background-image:url('/syracuse-landmark-atlas.png')}
 .corpse-sprite::before{inset:3% 4% 5%;background-image:url('/character-corpse-atlas.png')}
 .downtown-player,.downtown-rowan,.downtown-squirrel,.npc-actor,.corpse-actor,.hotspot.prop,.landmark-sprite.city-prop{overflow:visible}
+
+/* Holster-driven combat visuals. The generated atlas is a padded 5x2 transparent grid. */
+.player-weapon-sprite{--weapon-facing:1;position:absolute;z-index:3;left:-14px;top:-39px;width:116px;height:148px;background-image:url('/player-weapon-atlas-v1.png');background-size:500% 200%;background-repeat:no-repeat;background-color:transparent;filter:drop-shadow(0 12px 8px #0009) saturate(.9) contrast(1.05);transform:scaleX(var(--weapon-facing));transform-origin:50% 88%;pointer-events:none}
+.downtown-player[data-facing="left"] .player-weapon-sprite{--weapon-facing:-1}
+.downtown-player.weapon-firing .player-weapon-sprite{animation:playerWeaponRecoil .28s cubic-bezier(.2,.8,.2,1)}
+.ballistic-fx{position:absolute;z-index:8;left:71px;top:30px;width:170px;height:22px;transform-origin:left center;pointer-events:none;filter:drop-shadow(0 0 6px #ffb63d)}
+.ballistic-fx i{position:absolute;left:0;top:5px;width:34px;height:14px;background:radial-gradient(circle at left,#fff 0 9%,#ffd36c 15%,#e86821 43%,transparent 72%);clip-path:polygon(0 36%,65% 0,100% 50%,65% 100%,0 64%);animation:muzzleBloom .24s ease-out both}
+.ballistic-fx b{position:absolute;left:27px;top:10px;width:142px;height:2px;background:linear-gradient(90deg,#fff3aa,#e99b3e 35%,transparent);box-shadow:0 0 4px #ff9a29;animation:tracerFlight .2s ease-out both}
+.downtown-player[data-facing="left"] .ballistic-fx{left:17px;transform:scaleX(-1)}
+.downtown-player.weapon-shotgun .ballistic-fx i{width:47px;height:20px;top:1px}.downtown-player.weapon-rifle .ballistic-fx b{width:180px}
+.npc-actor.attack .sprite{animation:npcAttackRecoil .36s cubic-bezier(.15,.7,.2,1)}
+.npc-actor.attack .entity-ring{animation:npcPatrolRing .18s ease-in-out infinite alternate}
+.equip-slot.active-holster{border-color:#e1aa4e;box-shadow:0 0 0 1px #3c2815,0 0 14px #d98a2855;background-image:linear-gradient(#2d2214dd,#11140fe8),var(--hud-atlas)}
+.equip-slot.active-holster small{color:#f0c66f}
+@keyframes playerWeaponRecoil{0%{transform:scaleX(var(--weapon-facing)) translate(0,0) scale(1)}28%{transform:scaleX(var(--weapon-facing)) translate(-5px,2px) rotate(-1.5deg) scale(1.025)}100%{transform:scaleX(var(--weapon-facing)) translate(0,0) scale(1)}}
+@keyframes muzzleBloom{0%{opacity:0;transform:scale(.2)}25%{opacity:1;transform:scale(1.25)}100%{opacity:0;transform:scale(.6)}}
+@keyframes tracerFlight{from{opacity:1;transform:scaleX(.15)}to{opacity:0;transform:translateX(70px) scaleX(1)}}
+@keyframes npcAttackRecoil{0%{transform:scaleX(var(--actor-facing)) translate(0,0)}35%{transform:scaleX(var(--actor-facing)) translate(-5px,2px) rotate(-2deg)}100%{transform:scaleX(var(--actor-facing)) translate(0,0)}}

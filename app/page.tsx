@@ -57,6 +57,8 @@ type SpeechRecognitionController = {
 };
 
 type WorldPoint = { x: number; y: number };
+type WeaponType = "unarmed" | "pistol" | "rifle" | "shotgun" | "melee";
+type HolsterSlot = "holster-left" | "holster-right";
 type CollisionZone =
   | { kind: "rect"; x1: number; x2: number; y1: number; y2: number; label: string }
   | { kind: "ellipse"; x: number; y: number; rx: number; ry: number; label: string };
@@ -210,11 +212,11 @@ const initialCompanions: CompanionState[] = [{
 const reelSymbols = ["♠", "7", "☢", "♦", "★", "BAR"];
 
 type EquipSlot = "head" | "torso" | "legs" | "hands" | "feet" | "holster-left" | "holster-right";
-type InventoryItem = { id: number; name: string; icon: string; x: number; y: number; w: number; h: number; note: string; weight: number; fits?: Exclude<EquipSlot, "holster-left" | "holster-right"> | "holster"; equipped: EquipSlot | null };
+type InventoryItem = { id: number; name: string; icon: string; x: number; y: number; w: number; h: number; note: string; weight: number; fits?: Exclude<EquipSlot, "holster-left" | "holster-right"> | "holster"; equipped: EquipSlot | null; weaponType?: Exclude<WeaponType, "unarmed">; damage?: [number, number]; attackAp?: number; accuracy?: number };
 
 const ACTIVE_SAVE_KEY = "life-is-a-gamble-save";
 const SAVE_SLOTS_KEY = "life-is-a-gamble-save-slots";
-const SAVE_SCHEMA_VERSION = 3;
+const SAVE_SCHEMA_VERSION = 4;
 const MAX_MANUAL_SAVES = 8;
 
 type GameSnapshot = {
@@ -241,12 +243,14 @@ type GameSnapshot = {
   unlockedDoors: string[];
   playerPosition: WorldPoint;
   enemyPosition: WorldPoint;
+  rowanPosition: WorldPoint;
   lootedCorpses: NpcId[];
   inventory: InventoryItem[];
   quests: QuestState[];
   companions: CompanionState[];
   interior: string | null;
   selectedAction: string;
+  activeHolster: HolsterSlot;
   log: LogEntry[];
 };
 
@@ -270,7 +274,7 @@ function formatPlaytime(totalSeconds: number) {
 }
 
 const inventoryItems: InventoryItem[] = [
-  { id: 1, name: "Pipe Pistol", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "5–9 DMG · .22 scrapshot", weight: 2.1, fits: "holster", equipped: "holster-right" },
+  { id: 1, name: "Pipe Pistol", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "5–9 DMG · .22 scrapshot", weight: 2.1, fits: "holster", equipped: "holster-right", weaponType: "pistol", damage: [5, 9], attackAp: 3, accuracy: 0 },
   { id: 2, name: "Road Coat", icon: "♜", x: 3, y: 0, w: 2, h: 3, note: "+1 Armor · many pockets", weight: 4.2, fits: "torso", equipped: "torso" },
   { id: 3, name: "Dried Apples", icon: "●", x: 2, y: 0, w: 1, h: 1, note: "+8 HP · tastes like paper", weight: .4, equipped: null },
   { id: 4, name: "Bent Lockpick", icon: "⌁", x: 0, y: 0, w: 1, h: 2, note: "+5% Lockpick · fragile", weight: .1, equipped: null },
@@ -279,8 +283,19 @@ const inventoryItems: InventoryItem[] = [
   { id: 8, name: "Work Gloves", icon: "✥", x: 8, y: 0, w: 2, h: 1, note: "+1 Mechanics · cracked leather", weight: .6, fits: "hands", equipped: null },
   { id: 9, name: "Road Boots", icon: "⌊", x: 8, y: 2, w: 2, h: 2, note: "+1 Survival · resoled twice", weight: 2.4, fits: "feet", equipped: null },
   { id: 10, name: "Canvas Trousers", icon: "⋔", x: 6, y: 3, w: 2, h: 2, note: "+2 carry weight · reinforced knees", weight: 1.5, fits: "legs", equipped: null },
-  { id: 11, name: "Scrap Knife", icon: "†", x: 0, y: 3, w: 1, h: 2, note: "3–6 DMG · quiet and close", weight: .8, fits: "holster", equipped: null },
+  { id: 11, name: "Scrap Knife", icon: "†", x: 0, y: 3, w: 1, h: 2, note: "3–6 DMG · quiet and close", weight: .8, fits: "holster", equipped: null, weaponType: "melee", damage: [3, 6], attackAp: 3, accuracy: 8 },
+  { id: 12, name: "Service Rifle", icon: "⌁", x: 0, y: 5, w: 3, h: 1, note: "7–12 DMG · accurate at range", weight: 4.6, fits: "holster", equipped: null, weaponType: "rifle", damage: [7, 12], attackAp: 4, accuracy: 10 },
+  { id: 13, name: "Coach Shotgun", icon: "═", x: 3, y: 5, w: 3, h: 1, note: "9–15 DMG · brutal up close", weight: 5.2, fits: "holster", equipped: null, weaponType: "shotgun", damage: [9, 15], attackAp: 5, accuracy: -6 },
 ];
+
+const weaponTemplates = new Map(inventoryItems.filter((item) => item.weaponType).map((item) => [item.name, item]));
+
+function restoreInventory(items: InventoryItem[]) {
+  return items.map((item) => {
+    const template = weaponTemplates.get(item.name);
+    return template ? { ...item, weaponType: template.weaponType, damage: template.damage, attackAp: template.attackAp, accuracy: template.accuracy, fits: template.fits } : item;
+  });
+}
 
 const dialogueItemCatalog: Record<string, InventoryItem> = {
   "rowan-map": { id: 101, name: "Rowan's Transit Map", icon: "⌁", x: 0, y: 0, w: 1, h: 1, note: "Annotated safe lanes · Rowan's handwriting", weight: .1, equipped: null },
@@ -295,7 +310,7 @@ const corpseLoot: Record<NpcId, InventoryItem[]> = {
     { id: 201, name: "Squirrel Tail", icon: "〰", x: 0, y: 0, w: 1, h: 2, note: "Trophy · fever-warm fur", weight: .3, equipped: null },
   ],
   rowan: [
-    { id: 202, name: "Rowan's Revolver", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "7–11 DMG · worn walnut grip", weight: 2.4, fits: "holster", equipped: null },
+    { id: 202, name: "Rowan's Revolver", icon: "⌐", x: 0, y: 0, w: 2, h: 1, note: "7–11 DMG · worn walnut grip", weight: 2.4, fits: "holster", equipped: null, weaponType: "pistol", damage: [7, 11], attackAp: 3, accuracy: 5 },
     { ...dialogueItemCatalog["rowan-map"], id: 203 },
   ],
 };
@@ -336,7 +351,7 @@ function NpcActor({ className, status, statusTone, row, col, label, motion = "id
   row: number;
   col: number;
   label: string;
-  motion?: "idle" | "patrol" | "combat";
+  motion?: "idle" | "patrol" | "combat" | "attack";
   facing?: "left" | "right";
   position: WorldPoint;
   transitionMs?: number;
@@ -370,6 +385,16 @@ function CourierMotionSprite({ mode, frame, label }: { mode: "idle" | "walk" | "
       style={{ backgroundPosition: `${col * 33.333}% ${row * 100}%` }}
     />
   );
+}
+
+function PlayerWeaponSprite({ weaponType, firing, label }: { weaponType: WeaponType; firing: boolean; label: string }) {
+  const columns: Record<WeaponType, number> = { unarmed: 0, pistol: 1, rifle: 2, shotgun: 3, melee: 4 };
+  return <div
+    className={`player-weapon-sprite weapon-${weaponType}${firing ? " firing" : ""}`}
+    role="img"
+    aria-label={label}
+    style={{ backgroundPosition: `${columns[weaponType] * 25}% ${firing ? 100 : 0}%` }}
+  />;
 }
 
 function EnvSprite({ row, col, label, className = "", style }: { row: number; col: number; label: string; className?: string; style?: CSSProperties }) {
@@ -513,7 +538,7 @@ export default function Home() {
   const [skillPoints, setSkillPoints] = useState(2);
   const [skills, setSkills] = useState(initialSkills);
   const [luck] = useState(6);
-  const [selectedAction, setSelectedAction] = useState("Pistol");
+  const [selectedAction, setSelectedAction] = useState("Attack");
   const [isSpinning, setIsSpinning] = useState(false);
   const [reels, setReels] = useState(["♠", "7", "★"]);
   const [slotLabel, setSlotLabel] = useState("FATE AWAITS");
@@ -529,6 +554,12 @@ export default function Home() {
   const [enemyMoving, setEnemyMoving] = useState(false);
   const [enemyFacing, setEnemyFacing] = useState<"left" | "right">("right");
   const [enemyMoveDuration, setEnemyMoveDuration] = useState(1500);
+  const [rowanPosition, setRowanPosition] = useState<WorldPoint>({ x: 38, y: 72 });
+  const [rowanMoving, setRowanMoving] = useState(false);
+  const [rowanFacing, setRowanFacing] = useState<"left" | "right">("right");
+  const [rowanMoveDuration, setRowanMoveDuration] = useState(700);
+  const [enemyTactic, setEnemyTactic] = useState("ASSESSING");
+  const [weaponFiring, setWeaponFiring] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: InteractionTarget } | null>(null);
   const [worldProject, setWorldProject] = useState<GameProject | null>(null);
   const [worldSource, setWorldSource] = useState<"github" | "bundled" | "offline">("offline");
@@ -541,6 +572,7 @@ export default function Home() {
   const [speakingCharacter, setSpeakingCharacter] = useState<"YOU" | "ROWAN" | null>(null);
   const [dialogueEngine, setDialogueEngine] = useState<"ai" | "local" | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>(inventoryItems);
+  const [activeHolster, setActiveHolster] = useState<HolsterSlot>("holster-right");
   const [lootedCorpses, setLootedCorpses] = useState<NpcId[]>([]);
   const [quests, setQuests] = useState<QuestState[]>(initialQuests);
   const [companions, setCompanions] = useState<CompanionState[]>(initialCompanions);
@@ -570,6 +602,9 @@ export default function Home() {
   const movementToken = useRef(0);
   const enemyPatrolIndex = useRef(0);
   const enemyStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const enemyTurnToken = useRef(0);
+  const enemyTurnCount = useRef(0);
+  const bracedRef = useRef(false);
   const jackpotTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const npcCombatTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const combatTransitionRef = useRef(false);
@@ -588,12 +623,6 @@ export default function Home() {
       ? { kind: "ellipse", x: object.x + object.width / 2, y: object.y + object.height / 2, rx: object.width / 2, ry: object.height / 2, label: object.name }
       : { kind: "rect", x1: object.x, x2: object.x + object.width, y1: object.y, y2: object.y + object.height, label: object.name });
   }, [worldProject, worldLevel]);
-  const worldObjectCenter = (id: string, fallback: WorldPoint) => {
-    const object = worldProject?.levelObjects.find((entry) => entry.id === id);
-    return object ? { x: object.x + object.width / 2, y: object.y + object.height / 2 } : fallback;
-  };
-  const rowanPosition = worldObjectCenter("scene-rowan", { x: 38, y: 72 });
-
   useEffect(() => {
     let active = true;
     const loadWorld = async () => {
@@ -605,11 +634,13 @@ export default function Home() {
         setWorldProject(payload.project); setWorldSource(payload.source || "github");
         const firstLevel = payload.project.levels[0];
         const courier = payload.project.levelObjects.find((entry) => entry.id === "scene-courier");
+        const rowan = payload.project.levelObjects.find((entry) => entry.id === "scene-rowan");
         const squirrel = payload.project.levelObjects.find((entry) => entry.id === "scene-squirrel");
         if (firstLevel) {
           const spawn = courier ? { x: courier.x + courier.width / 2, y: courier.y + courier.height / 2 } : firstLevel.playerSpawn;
           setPlayerPosition(spawn); setDestination(spawn); setLocation(`${firstLevel.region} — ${firstLevel.name}`);
         }
+        if (rowan) setRowanPosition({ x: rowan.x + rowan.width / 2, y: rowan.y + rowan.height / 2 });
         if (squirrel) setEnemyPosition({ x: squirrel.x + squirrel.width / 2, y: squirrel.y + squirrel.height / 2 });
       } catch { if (active) setWorldSource("offline"); }
     };
@@ -645,20 +676,29 @@ export default function Home() {
     unlockedDoors: cloneValue(unlockedDoors),
     playerPosition: cloneValue(playerPosition),
     enemyPosition: cloneValue(enemyPosition),
+    rowanPosition: cloneValue(rowanPosition),
     lootedCorpses: cloneValue(lootedCorpses),
     inventory: cloneValue(inventory),
     quests: cloneValue(quests),
     companions: cloneValue(companions),
     interior,
     selectedAction,
+    activeHolster,
     log: cloneValue(log.slice(-30)),
   });
 
   const restoreSnapshot = (save: Partial<GameSnapshot>) => {
     movementToken.current += 1;
+    enemyTurnToken.current += 1;
+    enemyTurnCount.current = 0;
+    bracedRef.current = false;
     if (walkTimer.current) clearTimeout(walkTimer.current);
     if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
     setWalking(false);
+    setEnemyMoving(false);
+    setRowanMoving(false);
+    setWeaponFiring(false);
+    setEnemyTactic("ASSESSING");
     setContextMenu(null);
     setDialogueBusy(false);
     setSpeakingCharacter(null);
@@ -686,8 +726,9 @@ export default function Home() {
       setDestination(save.playerPosition);
     }
     if (save.enemyPosition && typeof save.enemyPosition.x === "number" && typeof save.enemyPosition.y === "number") setEnemyPosition(save.enemyPosition);
+    if (save.rowanPosition && typeof save.rowanPosition.x === "number" && typeof save.rowanPosition.y === "number") setRowanPosition(save.rowanPosition);
     if (Array.isArray(save.lootedCorpses)) setLootedCorpses(save.lootedCorpses.filter((id): id is NpcId => id === "rowan" || id === "squirrel"));
-    if (Array.isArray(save.inventory) && save.inventory.length) setInventory(save.inventory);
+    if (Array.isArray(save.inventory) && save.inventory.length) setInventory(restoreInventory(save.inventory));
     if (Array.isArray(save.quests)) {
       setQuests(save.quests);
       createdQuestIds.current = new Set(save.quests.map((quest) => quest.id));
@@ -696,6 +737,7 @@ export default function Home() {
     if (Array.isArray(save.companions)) setCompanions(save.companions);
     setInterior(typeof save.interior === "string" ? save.interior : null);
     if (typeof save.selectedAction === "string") setSelectedAction(save.selectedAction);
+    if (save.activeHolster === "holster-left" || save.activeHolster === "holster-right") setActiveHolster(save.activeHolster);
     if (Array.isArray(save.log) && save.log.length) {
       setLog(save.log.slice(-30));
       logId.current = Math.max(...save.log.map((entry) => Number(entry.id) || 0), 2) + 1;
@@ -748,7 +790,7 @@ export default function Home() {
       });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [saveReady, saveSlotsReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, unlockedDoors, playerPosition, enemyPosition, lootedCorpses, inventory, quests, companions, interior, selectedAction]);
+  }, [saveReady, saveSlotsReady, level, xp, chips, skills, skillPoints, npc, worldFlags, conversation, location, hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, unlockedDoors, playerPosition, enemyPosition, rowanPosition, lootedCorpses, inventory, quests, companions, interior, selectedAction, activeHolster]);
 
   useEffect(() => {
     localStorage.setItem("life-is-a-gamble-live-conversation", String(liveConversation));
@@ -802,17 +844,30 @@ export default function Home() {
 
   useEffect(() => () => {
     movementToken.current += 1;
+    enemyTurnToken.current += 1;
     if (walkTimer.current) clearTimeout(walkTimer.current);
     if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
     if (jackpotTimer.current) clearTimeout(jackpotTimer.current);
   }, []);
 
   const xpGoal = level * 100;
-  const combatFrame = combat === "player" ? 3 : combat === "enemy" ? 4 : null;
+  const activeWeapon = inventory.find((item) => item.equipped === activeHolster && item.weaponType)
+    || inventory.find((item) => (item.equipped === "holster-left" || item.equipped === "holster-right") && item.weaponType)
+    || null;
+  const activeWeaponType: WeaponType = activeWeapon?.weaponType || "unarmed";
+  const activeWeaponDamage: [number, number] = activeWeapon?.damage || [1, 3];
+  const activeWeaponAp = activeWeapon?.attackAp || 3;
+  const activeWeaponAccuracy = activeWeapon?.accuracy || 0;
   const squirrelFrame = enemyHp <= 0 ? 4 : combat === "enemy" ? 3 : isSpinning || enemyMoving ? 1 : 0;
   const selectedTargetName = selectedNpc === "rowan" ? "ROWAN VALE" : selectedNpc === "squirrel" ? "RABID SQUIRREL" : "NO TARGET";
   const selectedTargetHp = selectedNpc === "rowan" ? rowanHp : selectedNpc === "squirrel" ? enemyHp : 0;
   const selectedTargetMaxHp = selectedNpc === "rowan" ? 26 : selectedNpc === "squirrel" ? 18 : 1;
+
+  useEffect(() => {
+    if (inventory.some((item) => item.equipped === activeHolster && item.weaponType)) return;
+    const fallback = inventory.find((item) => (item.equipped === "holster-right" || item.equipped === "holster-left") && item.weaponType);
+    if (fallback?.equipped === "holster-left" || fallback?.equipped === "holster-right") setActiveHolster(fallback.equipped);
+  }, [inventory, activeHolster]);
 
   const addLog = (text: string, tone: LogEntry["tone"] = "plain") => {
     setLog((old) => [...old.slice(-5), { id: logId.current++, tone, text }]);
@@ -888,6 +943,9 @@ export default function Home() {
   const startNewGame = async () => {
     if (hasActiveSave && !window.confirm("Start a new game? Named saves will remain available, but the active autosave will be replaced.")) return;
     movementToken.current += 1;
+    enemyTurnToken.current += 1;
+    enemyTurnCount.current = 0;
+    bracedRef.current = false;
     if (walkTimer.current) clearTimeout(walkTimer.current);
     if (enemyStopTimer.current) clearTimeout(enemyStopTimer.current);
     setPanel(null);
@@ -895,11 +953,12 @@ export default function Home() {
     setHp(32); setMaxHp(32); setAp(7); setEnemyHp(18); setRowanHp(26);
     setCombat("idle"); setCombatTarget(null); setSelectedNpc(null);
     setLevel(1); setXp(35); setChips(37); setSkillPoints(2); setSkills(cloneValue(initialSkills));
-    setSelectedAction("Pistol"); setReels(["♠", "7", "★"]); setSlotLabel("FATE AWAITS");
+    setSelectedAction("Attack"); setReels(["♠", "7", "★"]); setSlotLabel("FATE AWAITS");
     setPlayerPosition({ x: 51, y: 71 }); setDestination({ x: 51, y: 71 }); setWalking(false);
     setEnemyPosition({ x: 66, y: 78 }); setEnemyMoving(false);
+    setRowanPosition({ x: 38, y: 72 }); setRowanMoving(false); setEnemyTactic("ASSESSING");
     setUnlockedDoors([]); setInterior(null); setDialogueInput(""); setDialogueEngine(null);
-    setInventory(cloneValue(inventoryItems)); setLootedCorpses([]); setQuests(cloneValue(initialQuests)); setCompanions(cloneValue(initialCompanions));
+    setInventory(cloneValue(inventoryItems)); setActiveHolster("holster-right"); setLootedCorpses([]); setQuests(cloneValue(initialQuests)); setCompanions(cloneValue(initialCompanions));
     setNpc({ trust: 18, respect: 24, fear: 8, mood: "Wary", opinion: "Another hungry drifter with a loaded question.", memories: ["Saw you approach the Salt Yard alone."] });
     setConversation([{ speaker: "ROWAN", text: "Easy. I’m not after your pack. Name’s Rowan. You always walk straight toward rabid wildlife, or is today special?" }]);
     setWorldFlags(["Rowan met at Salt Yard"]);
@@ -1211,22 +1270,120 @@ export default function Home() {
     return true;
   };
 
+  const combatDistance = (from: WorldPoint, to: WorldPoint) => Math.hypot(from.x - to.x, (from.y - to.y) * 1.45);
+
+  const moveCombatActor = async (actor: NpcId, requested: WorldPoint, token: number, fromOverride?: WorldPoint) => {
+    const from = fromOverride || (actor === "rowan" ? rowanPosition : enemyPosition);
+    const blockers: CollisionZone[] = [
+      ...authoredCollisionZones,
+      { kind: "ellipse", x: playerPosition.x, y: playerPosition.y, rx: 1.5, ry: 1.05, label: "player" },
+      ...(actor === "squirrel" && rowanHp > 0 ? [{ kind: "ellipse" as const, x: rowanPosition.x, y: rowanPosition.y, rx: 1.45, ry: 1, label: "Rowan" }] : []),
+      ...(actor === "rowan" && enemyHp > 0 && combatTarget !== "squirrel" ? [{ kind: "ellipse" as const, x: enemyPosition.x, y: enemyPosition.y, rx: 1.3, ry: .95, label: "squirrel" }] : []),
+    ];
+    const route = findWalkPath(from, requested, blockers, activeWalkBounds, !worldProject);
+    const next = route.at(-1);
+    if (!next) return from;
+    const bounds = sceneRef.current?.getBoundingClientRect();
+    const pixels = bounds ? Math.hypot((next.x - from.x) * bounds.width / 100, (next.y - from.y) * bounds.height / 100) : 100;
+    const duration = Math.max(320, Math.min(1050, pixels * (actor === "squirrel" ? 2.3 : 3.2)));
+    if (actor === "rowan") {
+      setRowanFacing(next.x < from.x ? "left" : "right");
+      setRowanMoveDuration(duration); setRowanMoving(true); setRowanPosition(next);
+    } else {
+      setEnemyFacing(next.x < from.x ? "left" : "right");
+      setEnemyMoveDuration(duration); setEnemyMoving(true); setEnemyPosition(next);
+    }
+    await new Promise((resolve) => setTimeout(resolve, duration));
+    if (token !== enemyTurnToken.current) return next;
+    if (actor === "rowan") setRowanMoving(false); else setEnemyMoving(false);
+    return next;
+  };
+
   const enemyTurn = async (turnTarget: NpcId | null = combatTarget) => {
     if (!turnTarget) return;
+    const token = ++enemyTurnToken.current;
+    const turnNumber = ++enemyTurnCount.current;
     setCombat("enemy");
-    audio.play(turnTarget === "rowan" ? "shoot" : "enemyAttack");
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    const dodgeChance = skills.Survival * 4 + luck * 2;
-    const roll = Math.floor(Math.random() * 100);
-    if (roll < dodgeChance) {
-      audio.play("enemyNormal");
-      addLog(turnTarget === "rowan" ? "You dive aside as Rowan's shot sparks off the curb." : "You read the lunge and step aside.", "good");
+    setAp(0);
+    let actionPoints = 7;
+    let actorPosition = turnTarget === "rowan" ? rowanPosition : enemyPosition;
+    const vectorFromPlayer = () => {
+      const dx = actorPosition.x - playerPosition.x;
+      const dy = actorPosition.y - playerPosition.y;
+      const length = Math.max(.1, Math.hypot(dx, dy));
+      return { dx: dx / length, dy: dy / length };
+    };
+    const resolveEnemyAttack = async () => {
+      if (token !== enemyTurnToken.current) return;
+      setEnemyTactic(turnTarget === "rowan" ? "FIRING" : "LUNGING");
+      audio.play(turnTarget === "rowan" ? "shootPistol" : "enemyAttack");
+      await new Promise((resolve) => setTimeout(resolve, turnTarget === "rowan" ? 360 : 280));
+      const dodgeChance = skills.Survival * 4 + luck * 2 + (bracedRef.current ? 12 : 0);
+      const roll = Math.floor(Math.random() * 100);
+      if (roll < dodgeChance) {
+        audio.play("enemyNormal");
+        addLog(turnTarget === "rowan" ? "You dive aside as Rowan's shot sparks off the curb." : "You read the lunge and step aside.", "good");
+      } else {
+        const damage = (turnTarget === "rowan" ? 5 : 3) + Math.floor(Math.random() * 5);
+        setHp((value) => Math.max(1, value - damage));
+        addLog(`${turnTarget === "rowan" ? "Rowan fires from her new angle" : "The rabid squirrel lunges and bites"} for ${damage} damage.`, "bad");
+      }
+    };
+
+    if (turnTarget === "squirrel") {
+      let distance = combatDistance(actorPosition, playerPosition);
+      if (distance > 7 && actionPoints >= 3) {
+        setEnemyTactic(distance > 18 ? "CLOSING FAST" : "STALKING");
+        const direction = vectorFromPlayer();
+        actorPosition = await moveCombatActor("squirrel", {
+          x: playerPosition.x + direction.dx * 4.4,
+          y: playerPosition.y + direction.dy * 3.2,
+        }, token, actorPosition);
+        actionPoints -= 3;
+        distance = combatDistance(actorPosition, playerPosition);
+        addLog("ENEMY MOVE · The squirrel darts through cover toward your flank.", "bad");
+      }
+      if (distance <= 9 && actionPoints >= 3) {
+        await resolveEnemyAttack();
+        actionPoints -= 3;
+      }
+      if (actionPoints >= 2 && token === enemyTurnToken.current) {
+        setEnemyTactic("CIRCLING");
+        const direction = vectorFromPlayer();
+        actorPosition = await moveCombatActor("squirrel", {
+          x: actorPosition.x - direction.dy * (turnNumber % 2 ? 5 : -5),
+          y: actorPosition.y + direction.dx * (turnNumber % 2 ? 3.5 : -3.5),
+        }, token, actorPosition);
+        addLog("ENEMY MOVE · The squirrel circles instead of presenting a clean shot.", "plain");
+      }
     } else {
-      const damage = (turnTarget === "rowan" ? 5 : 3) + Math.floor(Math.random() * 5);
-      setHp((v) => Math.max(1, v - damage));
-      addLog(`${turnTarget === "rowan" ? "Rowan shoots" : "Rabid Squirrel bites"} for ${damage} damage.`, "bad");
+      const distance = combatDistance(actorPosition, playerPosition);
+      if ((distance < 14 || turnNumber % 3 === 0) && actionPoints >= 3) {
+        const direction = vectorFromPlayer();
+        const strafe = turnNumber % 2 ? 1 : -1;
+        setEnemyTactic(distance < 14 ? "BREAKING CONTACT" : "SEEKING ANGLE");
+        actorPosition = await moveCombatActor("rowan", {
+          x: actorPosition.x + direction.dx * (distance < 14 ? 9 : 2) - direction.dy * 7 * strafe,
+          y: actorPosition.y + direction.dy * (distance < 14 ? 6 : 1.5) + direction.dx * 4 * strafe,
+        }, token, actorPosition);
+        actionPoints -= 3;
+        addLog(distance < 14 ? "ENEMY MOVE · Rowan disengages toward cover." : "ENEMY MOVE · Rowan changes her firing angle.", "bad");
+      }
+      if (actionPoints >= 4) {
+        await resolveEnemyAttack();
+        actionPoints -= 4;
+      }
+      if (actionPoints >= 3 && token === enemyTurnToken.current) {
+        const direction = vectorFromPlayer();
+        setEnemyTactic("REPOSITIONING");
+        await moveCombatActor("rowan", { x: actorPosition.x - direction.dy * 5, y: actorPosition.y + direction.dx * 3 }, token, actorPosition);
+      }
     }
+    if (token !== enemyTurnToken.current) return;
+    setEnemyMoving(false); setRowanMoving(false); setEnemyTactic("HOLDING");
+    bracedRef.current = false;
     setAp(7);
+    setSelectedAction("Attack");
     setCombat("player");
   };
 
@@ -1240,25 +1397,40 @@ export default function Home() {
     if (targetHp <= 0) return;
     const enteringCombat = combat !== "player" || combatTarget !== target;
     const startingEncounter = combat !== "player";
-    const cost = aimed ? 5 : 3;
+    const cost = activeWeaponAp + (aimed ? 2 : 0);
     const availableAp = startingEncounter ? 7 : ap;
     if (availableAp < cost) {
       addLog("Not enough Action Points.", "bad");
       return;
     }
+    const targetPosition = target === "rowan" ? rowanPosition : enemyPosition;
+    const distance = combatDistance(playerPosition, targetPosition);
+    if ((activeWeaponType === "melee" || activeWeaponType === "unarmed") && distance > 9) {
+      addLog(`${activeWeapon?.name || "Unarmed strike"} is out of reach. Move closer before attacking.`, "bad");
+      return;
+    }
     if (enteringCombat) startCombat(target);
     setAp(availableAp - cost);
-    audio.play("shoot");
+    setWeaponFiring(true);
+    if (activeWeaponType === "pistol") audio.play("shootPistol");
+    else if (activeWeaponType === "rifle") audio.play("shootRifle");
+    else if (activeWeaponType === "shotgun") audio.play("shootShotgun");
+    else audio.play("enemyAttack");
+    await new Promise((resolve) => setTimeout(resolve, activeWeaponType === "shotgun" ? 380 : 260));
+    setWeaponFiring(false);
     const result = await spinFate(aimed ? "Aimed shot" : "Attack check");
     const companionAssist = activeCompanion?.id === "rowan" && target === "squirrel";
-    const hitTarget = 38 + skills.Guns * 7 + luck * 2 + (aimed ? 16 : 0) + (companionAssist ? 5 : 0);
+    const rangeModifier = activeWeaponType === "shotgun" ? (distance < 14 ? 14 : -12) : activeWeaponType === "rifle" ? (distance > 12 ? 8 : -5) : 0;
+    const combatSkill = activeWeaponType === "melee" || activeWeaponType === "unarmed" ? skills.Survival : skills.Guns;
+    const hitTarget = 38 + combatSkill * 7 + luck * 2 + activeWeaponAccuracy + rangeModifier + (aimed ? 16 : 0) + (companionAssist ? 5 : 0);
     if (result.score <= hitTarget || result.jackpot) {
-      const damage = 5 + skills.Guns + (aimed ? 3 : 0) + (result.jackpot ? 8 : 0) + (companionAssist ? 2 : 0);
+      const baseDamage = activeWeaponDamage[0] + Math.floor(Math.random() * (activeWeaponDamage[1] - activeWeaponDamage[0] + 1));
+      const damage = baseDamage + Math.floor(combatSkill / 2) + (aimed ? 2 : 0) + (result.jackpot ? 8 : 0) + (companionAssist ? 2 : 0);
       const remaining = Math.max(0, targetHp - damage);
       if (target === "rowan") setRowanHp(remaining);
       else setEnemyHp(remaining);
       audio.play("enemyDamaged");
-      addLog(`${aimed ? "AIMED" : "SNAP"} SHOT · ${damage} damage to ${target === "rowan" ? "Rowan" : "Rabid Squirrel"}.`, "good");
+      addLog(`${aimed ? "AIMED" : activeWeaponType === "melee" || activeWeaponType === "unarmed" ? "CLOSE" : "SNAP"} ATTACK · ${damage} damage with ${activeWeapon?.name || "bare hands"} to ${target === "rowan" ? "Rowan" : "Rabid Squirrel"}.`, "good");
       if (remaining === 0) {
         setCombat("won");
         if (target === "rowan") {
@@ -1277,13 +1449,15 @@ export default function Home() {
         return;
       }
     } else {
-      addLog("The shot powders a patch of dead asphalt.", "bad");
+      addLog(activeWeaponType === "melee" || activeWeaponType === "unarmed" ? "The strike cuts empty air." : "The shot powders a patch of dead asphalt.", "bad");
     }
-    if (availableAp - cost < 3) enemyTurn(target);
+    if (availableAp - cost < Math.min(3, activeWeaponAp)) void enemyTurn(target);
   };
 
   const defend = async () => {
     if (combat !== "player" || ap < 2 || isSpinning) return;
+    setSelectedAction("Brace");
+    bracedRef.current = true;
     setAp((v) => v - 2);
     const result = await spinFate("Defensive read");
     if (result.score < 45 + skills.Survival * 5) {
@@ -1495,6 +1669,7 @@ export default function Home() {
         const compatible = item.fits === slot || (item.fits === "holster" && slot.startsWith("holster"));
         if (!compatible || inventory.some((entry) => entry.id !== item.id && entry.equipped === slot)) return null;
         setInventory((items) => items.map((entry) => entry.id === item.id ? { ...entry, equipped: slot } : entry));
+        if (slot === "holster-left" || slot === "holster-right") setActiveHolster(slot);
         audio.play("equip");
         return `EQUIPPED · ${item.name}`;
       }
@@ -1582,7 +1757,8 @@ export default function Home() {
     setDialogueInput("");
     setConversation((v) => [...v, { speaker: "YOU", text: message }]);
     setDialogueBusy(true);
-    queueVoice(message, "player", "intentional");
+    // Live mic already carries the player's real voice; only typed dialogue needs synthetic player narration.
+    if (!liveConversation) queueVoice(message, "player", "intentional");
     const slot = await spinFate("Dialogue check");
     try {
       const response = await fetch("/api/dialogue", {
@@ -1593,7 +1769,7 @@ export default function Home() {
           history: conversation.slice(-24),
           game: {
             hp, maxHp, ap, enemyHp, rowanHp, combat, combatTarget, selectedNpc, level, xp, xpGoal, chips, skillPoints,
-            unlockedDoors, interior, playerPosition,
+            unlockedDoors, interior, playerPosition, rowanPosition, activeHolster,
             inventory: inventory.map((item) => ({ id: item.id, name: item.name, equipped: item.equipped })),
             quests,
             companions,
@@ -1761,11 +1937,12 @@ export default function Home() {
             {cityDecor.map((decor, index) => <DecorSprite key={`${decor.className}-${index}`} {...decor} />)}</>}
 
             <div className="walk-destination" style={{ left: `${destination.x}%`, top: `${destination.y}%` }} />
-            <div className={`downtown-player ${walking ? `walking ${movementMode}` : ""}`} data-facing={walkFacing} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
+            <div className={`downtown-player weapon-${activeWeaponType}${walking ? ` walking ${movementMode}` : ""}${weaponFiring ? " weapon-firing" : ""}`} data-facing={walkFacing} data-weapon={activeWeaponType} style={{ left: `${playerPosition.x}%`, top: `${playerPosition.y}%`, transitionDuration: `${walkDuration}ms` }}>
               <div className="status-tag you">YOU {walking ? `· ${movementMode === "run" ? "RUNNING" : "WALKING"}` : "· READY"}</div>
-              {combatFrame === null
-                ? <CourierMotionSprite mode={walking ? movementMode : "idle"} frame={walkFrame} label={`Courier ${walking ? movementMode : "standing"} in downtown Syracuse`} />
-                : <Sprite row={0} col={combatFrame} label="Courier in combat in downtown Syracuse" />}
+              {walking
+                ? <CourierMotionSprite mode={movementMode} frame={walkFrame} label={`Courier ${movementMode} in downtown Syracuse`} />
+                : <PlayerWeaponSprite weaponType={activeWeaponType} firing={weaponFiring} label={`Courier ${weaponFiring ? "attacking with" : "carrying"} ${activeWeapon?.name || "no weapon"} in downtown Syracuse`} />}
+              {weaponFiring && activeWeaponType !== "unarmed" && activeWeaponType !== "melee" && <div className="ballistic-fx" aria-hidden="true"><i/><b/></div>}
               <div className="entity-ring" />
             </div>
 
@@ -1778,9 +1955,11 @@ export default function Home() {
               label="Target Rowan Vale"
               position={rowanPosition}
               selected={selectedNpc === "rowan"}
-              motion={combatTarget === "rowan" && combat !== "idle" ? "combat" : "idle"}
+              motion={combatTarget === "rowan" && combat === "enemy" && enemyTactic === "FIRING" ? "attack" : rowanMoving ? "patrol" : combatTarget === "rowan" && combat !== "idle" ? "combat" : "idle"}
+              facing={rowanFacing}
               onClick={(event) => { event.stopPropagation(); selectNpc("rowan"); }}
               onContextMenu={(event) => openNpcInteraction(event, "rowan")}
+              transitionMs={rowanMoveDuration}
             />}
             {enemyHp > 0 && <NpcActor
               className="downtown-squirrel"
@@ -1789,7 +1968,7 @@ export default function Home() {
               row={1}
               col={squirrelFrame}
               label="Target rabid squirrel"
-              motion={combatTarget === "squirrel" && combat !== "idle" ? "combat" : enemyMoving ? "patrol" : "idle"}
+              motion={combatTarget === "squirrel" && combat === "enemy" && enemyTactic === "LUNGING" ? "attack" : enemyMoving ? "patrol" : combatTarget === "squirrel" && combat !== "idle" ? "combat" : "idle"}
               facing={enemyFacing}
               position={enemyPosition}
               transitionMs={enemyMoveDuration}
@@ -1844,16 +2023,16 @@ export default function Home() {
           </button>
 
           <section className="turn-panel">
-            <div className="section-heading"><span>{combat === "player" ? "YOUR TURN" : combat === "enemy" ? "ENEMY TURN" : "FIELD ACTIONS"}</span><b>{ap} AP</b></div>
+            <div className="section-heading"><span>{combat === "player" ? "YOUR TURN" : combat === "enemy" ? `ENEMY · ${enemyTactic}` : "FIELD ACTIONS"}</span><b>{ap} AP</b></div>
             <div className="ap-pips">{Array.from({ length: 7 }, (_, i) => <i key={i} className={i < ap ? "filled" : ""} />)}</div>
             <div className={`target-readout ${selectedNpc ? "locked" : ""}`}><div><small>ACTIVE TARGET</small><strong>{selectedTargetName}</strong></div><span>{selectedNpc ? `HP ${selectedTargetHp}/${selectedTargetMaxHp}` : "CLICK AN NPC"}</span></div>
             <div className="weapon-card">
-              <div className="weapon-art">⌐<span>• • •</span></div>
-              <div><small>EQUIPPED</small><strong>PIPE PISTOL</strong><span>5–9 DMG · 71% BASE</span></div>
+              <div className={`weapon-art weapon-${activeWeaponType}`}>{activeWeapon?.icon || "✊"}<span>{activeHolster === "holster-right" ? "R" : "L"} HOLSTER</span></div>
+              <div><small>ACTIVE LOADOUT</small><strong>{activeWeapon?.name || "BARE HANDS"}</strong><span>{activeWeaponDamage[0]}–{activeWeaponDamage[1]} DMG · {activeWeaponAp} AP · {activeWeaponType.toUpperCase()}</span></div>
             </div>
             <div className="action-grid">
-              <button className={selectedAction === "Pistol" ? "selected" : ""} onClick={() => { setSelectedAction("Pistol"); attack(false); }} disabled={!selectedNpc || selectedTargetHp <= 0 || combat === "enemy" || isSpinning}><span>3 AP</span><b>SNAP SHOT</b><em>{combat === "idle" ? "Start combat" : "Guns + Luck"}</em></button>
-              <button onClick={() => { setSelectedAction("Aim"); attack(true); }} disabled={!selectedNpc || selectedTargetHp <= 0 || combat === "enemy" || isSpinning}><span>5 AP</span><b>AIMED SHOT</b><em>{combat === "idle" ? "Start combat" : "+16% hit"}</em></button>
+              <button className={selectedAction === "Attack" ? "selected" : ""} onClick={() => { setSelectedAction("Attack"); void attack(false); }} disabled={!selectedNpc || selectedTargetHp <= 0 || combat === "enemy" || isSpinning}><span>{activeWeaponAp} AP</span><b>{activeWeaponType === "melee" || activeWeaponType === "unarmed" ? "STRIKE" : "SNAP SHOT"}</b><em>{combat === "idle" ? "Start combat" : `${activeWeaponType === "melee" || activeWeaponType === "unarmed" ? "Survival" : "Guns"} + Luck`}</em></button>
+              <button onClick={() => { setSelectedAction("Aim"); void attack(true); }} disabled={!selectedNpc || selectedTargetHp <= 0 || combat === "enemy" || isSpinning}><span>{activeWeaponAp + 2} AP</span><b>{activeWeaponType === "melee" || activeWeaponType === "unarmed" ? "POWER ATTACK" : "AIMED SHOT"}</b><em>{combat === "idle" ? "Start combat" : "+16% hit"}</em></button>
               <button onClick={defend} disabled={combat !== "player" || isSpinning}><span>2 AP</span><b>BRACE</b><em>Survival check</em></button>
               <button onClick={() => setPanel("dialogue")} disabled={selectedNpc !== "rowan" || rowanHp <= 0 || combat === "enemy"}><span>—</span><b>TALK</b><em>{selectedNpc === "rowan" ? "Rowan" : "Target Rowan"}</em></button>
             </div>
@@ -1885,7 +2064,7 @@ export default function Home() {
           <section className={`modal ${panel}`} role="dialog" aria-modal="true" aria-label={`${panel} panel`}>
             <button className="close" onClick={() => setPanel(null)} aria-label="Close panel">×</button>
 
-            {panel === "inventory" && <Inventory chips={chips} playEquip={() => audio.play("equip")} items={inventory} setItems={setInventory} />}
+            {panel === "inventory" && <Inventory chips={chips} playEquip={() => audio.play("equip")} items={inventory} setItems={setInventory} activeHolster={activeHolster} setActiveHolster={setActiveHolster} />}
             {panel === "skills" && <Skills level={level} skills={skills} points={skillPoints} upgrade={upgradeSkill} />}
             {panel === "map" && <WorldMap level={level} location={location} travel={travel} />}
             {panel === "journal" && <Journal quests={quests} companions={companions} dismiss={(id) => {
@@ -2004,7 +2183,7 @@ function LegacyInventory({ chips }: { chips: number }) {
   </div>;
 }
 
-function Inventory({ chips, playEquip, items, setItems }: { chips: number; playEquip: () => void; items: InventoryItem[]; setItems: React.Dispatch<React.SetStateAction<InventoryItem[]>> }) {
+function Inventory({ chips, playEquip, items, setItems, activeHolster, setActiveHolster }: { chips: number; playEquip: () => void; items: InventoryItem[]; setItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>; activeHolster: HolsterSlot; setActiveHolster: (slot: HolsterSlot) => void }) {
   const [selectedId, setSelectedId] = useState(inventoryItems[0].id);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -2041,6 +2220,10 @@ function Inventory({ chips, playEquip, items, setItems }: { chips: number; playE
     else {
       if (item.equipped) playEquip();
       setItems((old) => old.map((entry) => entry.id === item.id ? { ...entry, x, y, equipped: null } : entry));
+      if (item.equipped === activeHolster) {
+        const alternate = activeHolster === "holster-right" ? "holster-left" : "holster-right";
+        if (items.some((entry) => entry.id !== item.id && entry.equipped === alternate && entry.weaponType)) setActiveHolster(alternate);
+      }
       setMessage(`${item.name} stowed at pack cell ${x + 1}, ${y + 1}.`);
     }
     setDraggingId(null); setDragOver(null);
@@ -2057,6 +2240,7 @@ function Inventory({ chips, playEquip, items, setItems }: { chips: number; playE
     else {
       playEquip();
       setItems((old) => old.map((entry) => entry.id === item.id ? { ...entry, equipped: slot } : entry));
+      if (slot === "holster-left" || slot === "holster-right") setActiveHolster(slot);
       setMessage(`${item.name} equipped to ${slot.replace("-", " ")}.`);
     }
     setDraggingId(null); setDragOver(null);
@@ -2071,9 +2255,10 @@ function Inventory({ chips, playEquip, items, setItems }: { chips: number; playE
         <div className="body-silhouette" aria-label="Courier equipment silhouette"><i className="sil-head"/><i className="sil-torso"/><i className="sil-arm left"/><i className="sil-arm right"/><i className="sil-leg left"/><i className="sil-leg right"/></div>
         {slots.map((slot) => {
           const equipped = items.find((item) => item.equipped === slot.id);
-          return <div key={slot.id} className={`equip-slot slot-${slot.id} ${dragOver === slot.id ? "drag-over" : ""} ${equipped ? "occupied" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver(slot.id); }} onDragLeave={() => setDragOver(null)} onDrop={(event) => dropOnSlot(event, slot.id)}>
-            <small>{slot.mark} {slot.label}</small>
-            {equipped ? <button draggable onDragStart={(event) => beginDrag(event, equipped)} onDragEnd={() => { setDraggingId(null); setDragOver(null); }} onClick={() => setSelectedId(equipped.id)}><b>{equipped.icon}</b><span>{equipped.name}</span></button> : <em>EMPTY</em>}
+          const isActive = (slot.id === "holster-left" || slot.id === "holster-right") && activeHolster === slot.id;
+          return <div key={slot.id} className={`equip-slot slot-${slot.id} ${dragOver === slot.id ? "drag-over" : ""} ${equipped ? "occupied" : ""}${isActive ? " active-holster" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver(slot.id); }} onDragLeave={() => setDragOver(null)} onDrop={(event) => dropOnSlot(event, slot.id)}>
+            <small>{slot.mark} {slot.label}{isActive ? " · ACTIVE" : ""}</small>
+            {equipped ? <button draggable onDragStart={(event) => beginDrag(event, equipped)} onDragEnd={() => { setDraggingId(null); setDragOver(null); }} onClick={() => { setSelectedId(equipped.id); if (slot.id === "holster-left" || slot.id === "holster-right") { setActiveHolster(slot.id); setMessage(`${equipped.name} is now the active weapon.`); } }}><b>{equipped.icon}</b><span>{equipped.name}</span></button> : <em>EMPTY</em>}
           </div>;
         })}
       </div>
@@ -2085,7 +2270,7 @@ function Inventory({ chips, playEquip, items, setItems }: { chips: number; playE
         <div className="item-readout"><div><small>INSPECTED ITEM · {selected.equipped ? `EQUIPPED: ${selected.equipped.toUpperCase()}` : `${selected.w}×${selected.h} PACK CELLS`}</small><strong>{selected.name}</strong><p>{selected.note} · {selected.weight.toFixed(1)} KG</p><em>{message}</em></div><b>{selected.icon}</b></div>
       </div>
     </div>
-    <div className="inventory-foot"><span>OLD-WORLD CHIPS</span><b>◉ {chips}</b><em>Drag equipped items back into any valid pack cell to unequip</em></div>
+    <div className="inventory-foot"><span>OLD-WORLD CHIPS</span><b>◉ {chips}</b><em>Click a holstered weapon to make that side active · drag to stow</em></div>
   </div>;
 }
 

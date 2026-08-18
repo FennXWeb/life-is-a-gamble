@@ -96,6 +96,8 @@ export type DialogueGameSnapshot = {
   unlockedDoors: string[];
   interior: string | null;
   playerPosition: { x: number; y: number };
+  rowanPosition?: { x: number; y: number };
+  activeHolster?: "holster-left" | "holster-right";
   inventory: Array<{ id: number; name: string; equipped: string | null }>;
   quests: QuestState[];
   companions: CompanionState[];

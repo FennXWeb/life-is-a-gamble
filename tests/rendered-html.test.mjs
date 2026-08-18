@@ -119,6 +119,7 @@ test("dead characters leave persistent lootable corpses and live dialogue uses t
   assert.match(page, /volume > \.022/);
   assert.match(page, /life-is-a-gamble-live-conversation/);
   assert.match(page, /speakRef\.current\(clean\)/);
+  assert.match(page, /if \(!liveConversation\) queueVoice\(message, "player", "intentional"\)/);
   assert.match(transcription, /gpt-4o-mini-transcribe/);
   assert.match(transcription, /\/v1\/audio\/transcriptions/);
   assert.match(css, /character-corpse-atlas\.png/);
@@ -126,6 +127,31 @@ test("dead characters leave persistent lootable corpses and live dialogue uses t
   assert.match(css, /Atlas safety gutters/);
   assert.match(css, /\.decor-sprite::before\{[^}]*inset:4% 5% 6%/);
   assert.match(css, /\.sprite::before\{[^}]*life-is-a-gamble-sprite-atlas-v2\.png/);
+});
+
+test("combat AI moves tactically and the active holster drives weapon art, stats, animation, and SFX", async () => {
+  const [page, css, audio, atlas] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-audio.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/player-weapon-atlas-v1.png", import.meta.url)),
+  ]);
+  assert.equal(atlas[25], 6, "weapon atlas must use RGBA color type");
+  assert.match(page, /type WeaponType = "unarmed" \| "pistol" \| "rifle" \| "shotgun" \| "melee"/);
+  assert.match(page, /const moveCombatActor/);
+  assert.match(page, /CLOSING FAST/);
+  assert.match(page, /SEEKING ANGLE/);
+  assert.match(page, /activeWeapon = inventory\.find/);
+  assert.match(page, /function restoreInventory/);
+  assert.match(page, /setInventory\(restoreInventory\(save\.inventory\)\)/);
+  assert.match(page, /enemyTurnToken\.current \+= 1/);
+  assert.match(page, /setActiveHolster\(slot\)/);
+  assert.match(page, /<PlayerWeaponSprite weaponType=\{activeWeaponType\} firing=\{weaponFiring\}/);
+  assert.match(css, /player-weapon-atlas-v1\.png/);
+  assert.match(css, /\.ballistic-fx/);
+  assert.match(audio, /sound === "shootPistol"/);
+  assert.match(audio, /sound === "shootRifle"/);
+  assert.match(audio, /sound === "shootShotgun"/);
 });
 
 test("dialogue can create validated quests and recruit a companion", async () => {
@@ -184,12 +210,14 @@ test("versioned save slots persist the complete RPG state in the native game", a
     readFile(new URL("../game/src/main.cjs", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /SAVE_SCHEMA_VERSION = 3/);
+  assert.match(page, /SAVE_SCHEMA_VERSION = 4/);
   assert.match(page, /MAX_MANUAL_SAVES = 8/);
   assert.match(page, /const makeSnapshot/);
   assert.match(page, /quests: cloneValue\(quests\)/);
   assert.match(page, /companions: cloneValue\(companions\)/);
   assert.match(page, /enemyPosition: cloneValue\(enemyPosition\)/);
+  assert.match(page, /rowanPosition: cloneValue\(rowanPosition\)/);
+  assert.match(page, /activeHolster,/);
   assert.match(page, /event\.key === "F5"/);
   assert.match(page, /event\.key === "F9"/);
   assert.match(page, /<SaveLoad/);
