@@ -21,6 +21,8 @@ export type SpriteAsset = {
   height: number;
   category: "terrain" | "structure" | "prop" | "character" | "effect";
   tags: string[];
+  builtIn?: boolean;
+  frame?: { columns: number; rows: number; column: number; row: number };
 };
 
 export type LevelLayer = {

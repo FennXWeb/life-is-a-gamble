@@ -1,4 +1,5 @@
 import type { GameProject } from "./project-types";
+import { builtInSprites, builtInSyracuseScene } from "./builtin-sprites";
 
 export function createDefaultProject(): GameProject {
   return {
@@ -57,14 +58,14 @@ export function createDefaultProject(): GameProject {
         doors: [],
       },
     ],
-    spriteAssets: [],
+    spriteAssets: builtInSprites(),
     levelLayers: [
       { id: "syracuse-terrain", levelId: "syracuse-salt-yard", name: "Terrain", kind: "terrain", visible: true, locked: false, opacity: 1 },
       { id: "syracuse-objects", levelId: "syracuse-salt-yard", name: "Objects", kind: "objects", visible: true, locked: false, opacity: 1 },
       { id: "syracuse-collision", levelId: "syracuse-salt-yard", name: "Collision", kind: "collision", visible: true, locked: false, opacity: 0.65 },
       { id: "syracuse-entities", levelId: "syracuse-salt-yard", name: "Entities", kind: "entities", visible: true, locked: false, opacity: 1 },
     ],
-    levelObjects: [],
+    levelObjects: builtInSyracuseScene("syracuse-objects", "syracuse-entities"),
     lootTables: [
       {
         id: "street-cache-common",

@@ -21,6 +21,19 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
   return <label className={`${styles.builderField} ${wide ? styles.builderWide : ""}`}><span>{label}</span>{children}</label>;
 }
 
+function spriteUrl(sprite: SpriteAsset) {
+  return sprite.builtIn ? `/${sprite.path.replace(/^public\//, "")}` : `/api/editor/assets?path=${encodeURIComponent(sprite.path)}`;
+}
+
+function SpriteVisual({ sprite, alt }: { sprite: SpriteAsset; alt: string }) {
+  const source = spriteUrl(sprite);
+  if (!sprite.frame) return <img className={styles.spriteVisual} draggable={false} src={source} alt={alt} />;
+  const { columns, rows, column, row } = sprite.frame;
+  const x = columns <= 1 ? 0 : column / (columns - 1) * 100;
+  const y = rows <= 1 ? 0 : row / (rows - 1) * 100;
+  return <span className={styles.spriteVisual} role="img" aria-label={alt} style={{ backgroundImage: `url('${source}')`, backgroundSize: `${columns * 100}% ${rows * 100}%`, backgroundPosition: `${x}% ${y}%` }} />;
+}
+
 function defaultLayers(levelId: string): LevelLayer[] {
   return [
     { id: makeId(`${levelId}-terrain`, "layer"), levelId, name: "Terrain", kind: "terrain", visible: true, locked: false, opacity: 1 },
@@ -46,11 +59,17 @@ export function LevelBuilder({ project, edit, setNotice }: { project: GameProjec
   const [selectedObjectId, setSelectedObjectId] = useState("");
   const [selectedCellId, setSelectedCellId] = useState("");
   const [spriteId, setSpriteId] = useState(project.spriteAssets[0]?.id || "");
+  const [assetQuery, setAssetQuery] = useState("");
+  const [assetCategory, setAssetCategory] = useState<"all" | SpriteAsset["category"]>("all");
   const [draftRect, setDraftRect] = useState<DraftRect | null>(null);
   const [drag, setDrag] = useState<{ kind: "draw" | "move"; start: Point; origin?: Point } | null>(null);
   const [importing, setImporting] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const visibleSprites = useMemo(() => {
+    const query = assetQuery.trim().toLowerCase();
+    return project.spriteAssets.filter((sprite) => (assetCategory === "all" || sprite.category === assetCategory) && (!query || `${sprite.name} ${sprite.tags.join(" ")}`.toLowerCase().includes(query)));
+  }, [assetCategory, assetQuery, project.spriteAssets]);
 
   if (!level) return <div className={styles.builderEmpty}><b>＋</b><h2>Create the first level</h2><p>Start with a canvas, then draw cells, import sprites, and place collision-ready objects.</p><button onClick={() => {
     const id = makeId("new-level", "level");
@@ -161,7 +180,8 @@ export function LevelBuilder({ project, edit, setNotice }: { project: GameProjec
     <aside className={styles.builderLeft}>
       <section><div className={styles.builderSectionHead}><span>LAYERS</span><button onClick={addLayer}>＋</button></div><div className={styles.layerList}>{[...layers].reverse().map((layer) => <div key={layer.id} className={activeLayer?.id === layer.id ? styles.layerActive : ""}><button aria-label={layer.visible ? "Hide layer" : "Show layer"} onClick={() => updateLayer(layer.id, { visible: !layer.visible })}>{layer.visible ? "◉" : "○"}</button><button className={styles.layerPick} onClick={() => setLayerId(layer.id)}><b>{layer.name}</b><small>{layer.kind}</small></button><button aria-label={layer.locked ? "Unlock layer" : "Lock layer"} onClick={() => updateLayer(layer.id, { locked: !layer.locked })}>{layer.locked ? "▣" : "□"}</button></div>)}</div></section>
       <section className={styles.spriteLibrary}><div className={styles.builderSectionHead}><span>SPRITE LIBRARY</span><button onClick={() => fileRef.current?.click()} disabled={importing}>{importing ? "…" : "IMPORT"}</button><input ref={fileRef} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importSprite(file); }} /></div>
-        {project.spriteAssets.length === 0 ? <div className={styles.spriteEmpty}><b>▧</b><p>Import a sprite to place art directly into the game repository.</p></div> : <div className={styles.spriteGrid}>{project.spriteAssets.map((sprite) => <button key={sprite.id} className={sprite.id === spriteId ? styles.spriteActive : ""} onClick={() => { setSpriteId(sprite.id); setTool("place"); }}><img src={`/api/editor/assets?path=${encodeURIComponent(sprite.path)}`} alt="" /><span>{sprite.name}</span><small>{sprite.width}×{sprite.height}</small></button>)}</div>}
+        <div className={styles.assetFilters}><input aria-label="Search sprites" placeholder={`Search ${project.spriteAssets.length} sprites…`} value={assetQuery} onChange={(event) => setAssetQuery(event.target.value)} /><select aria-label="Sprite category" value={assetCategory} onChange={(event) => setAssetCategory(event.target.value as typeof assetCategory)}><option value="all">All art</option><option value="terrain">Terrain</option><option value="structure">Structures</option><option value="prop">Props</option><option value="character">Characters</option><option value="effect">Materials / FX</option></select></div>
+        {visibleSprites.length === 0 ? <div className={styles.spriteEmpty}><b>▧</b><p>No art matches this filter. Import another sprite or change the search.</p></div> : <div className={styles.spriteGrid}>{visibleSprites.map((sprite) => <button key={sprite.id} className={sprite.id === spriteId ? styles.spriteActive : ""} onClick={() => { setSpriteId(sprite.id); setTool("place"); }}><SpriteVisual sprite={sprite} alt={sprite.name} /><span>{sprite.name}</span><small>{sprite.category} · {sprite.frame ? "atlas frame" : `${sprite.width}×${sprite.height}`}</small></button>)}</div>}
       </section>
       <section><div className={styles.builderSectionHead}><span>CELLS</span><b>{cells.length}</b></div><div className={styles.cellList}>{cells.map((cell) => <button key={cell.id} className={cell.id === selectedCellId ? styles.layerActive : ""} onClick={() => { setSelectedCellId(cell.id); setSelectedObjectId(""); }}><b>{cell.name}</b><small>{cell.kind} · {cell.doors.length} doors</small></button>)}</div></section>
     </aside>
@@ -169,7 +189,7 @@ export function LevelBuilder({ project, edit, setNotice }: { project: GameProjec
       <div className={styles.canvasRulers}><span>{level.region} / {level.name}</span><b>{level.width} × {level.height} UNITS</b></div>
       <div className={styles.canvasScroll}><div ref={canvasRef} className={styles.builderCanvas} style={{ width: `${zoom * 100}%`, aspectRatio: `${level.width}/${level.height}`, backgroundSize: `${level.gridSize / level.width * 100}% ${level.gridSize / level.height * 100}%` }} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={onCanvasUp} onPointerCancel={onCanvasUp}>
         {cells.map((cell) => <button key={cell.id} className={`${styles.builderCell} ${cell.id === selectedCellId ? styles.builderCellSelected : ""}`} style={{ left: `${cell.x / level.width * 100}%`, top: `${cell.y / level.height * 100}%`, width: `${cell.width / level.width * 100}%`, height: `${cell.height / level.height * 100}%` }} onPointerDown={(event) => { event.stopPropagation(); setSelectedCellId(cell.id); setSelectedObjectId(""); if (tool === "erase") edit((draft) => { draft.cells = draft.cells.filter((entry) => entry.id !== cell.id); }); }}><span>{cell.name}</span></button>)}
-        {layers.filter((layer) => layer.visible).flatMap((layer) => objects.filter((object) => object.layerId === layer.id).map((object) => { const sprite = project.spriteAssets.find((asset) => asset.id === object.spriteId); return <button key={object.id} className={`${styles.levelObject} ${object.id === selectedObjectId ? styles.objectSelected : ""} ${object.collision.enabled ? styles.collisionObject : ""}`} style={{ left: `${object.x / level.width * 100}%`, top: `${object.y / level.height * 100}%`, width: `${object.width / level.width * 100}%`, height: `${object.height / level.height * 100}%`, opacity: layer.opacity, transform: `rotate(${object.rotation}deg) scale(${object.flipX ? -object.scaleX : object.scaleX}, ${object.flipY ? -object.scaleY : object.scaleY})`, backgroundColor: sprite ? "transparent" : object.tint }} onPointerDown={(event) => beginMove(event, object)}>{sprite ? <img draggable={false} src={`/api/editor/assets?path=${encodeURIComponent(sprite.path)}`} alt={object.name} /> : <span>{object.collision.enabled ? "COLLISION" : object.name}</span>}</button>; }))}
+        {layers.filter((layer) => layer.visible).flatMap((layer) => objects.filter((object) => object.layerId === layer.id).map((object) => { const sprite = project.spriteAssets.find((asset) => asset.id === object.spriteId); return <button key={object.id} className={`${styles.levelObject} ${object.id === selectedObjectId ? styles.objectSelected : ""} ${object.collision.enabled ? styles.collisionObject : ""}`} style={{ left: `${object.x / level.width * 100}%`, top: `${object.y / level.height * 100}%`, width: `${object.width / level.width * 100}%`, height: `${object.height / level.height * 100}%`, opacity: layer.opacity, transform: `rotate(${object.rotation}deg) scale(${object.flipX ? -object.scaleX : object.scaleX}, ${object.flipY ? -object.scaleY : object.scaleY})`, backgroundColor: sprite ? "transparent" : object.tint }} onPointerDown={(event) => beginMove(event, object)}>{sprite ? <SpriteVisual sprite={sprite} alt={object.name} /> : <span>{object.collision.enabled ? "COLLISION" : object.name}</span>}</button>; }))}
         {cells.flatMap((cell) => cell.doors.filter((door) => door.x !== undefined && door.y !== undefined).map((door) => <button key={door.id} className={styles.doorMarker} title={`${door.name} → ${door.targetCellId || "unassigned"}`} style={{ left: `${(door.x || 0) / level.width * 100}%`, top: `${(door.y || 0) / level.height * 100}%`, width: `${(door.width || level.gridSize) / level.width * 100}%`, height: `${(door.height || level.gridSize) / level.height * 100}%` }} onClick={(event) => { event.stopPropagation(); setSelectedCellId(cell.id); setSelectedObjectId(""); }}>⇥</button>))}
         <i className={styles.builderSpawn} style={{ left: `${level.playerSpawn.x / level.width * 100}%`, top: `${level.playerSpawn.y / level.height * 100}%` }}>◆</i>
         {draftRect && <i className={styles.drawPreview} style={{ left: `${draftRect.x / level.width * 100}%`, top: `${draftRect.y / level.height * 100}%`, width: `${draftRect.width / level.width * 100}%`, height: `${draftRect.height / level.height * 100}%` }} />}

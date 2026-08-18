@@ -2,6 +2,7 @@ import { createDefaultProject } from "../../../editor/default-project";
 import { requireEditorAdmin } from "../../../editor/admin";
 import { getGitHubMountConfig, getGitHubMountTarget, githubError, readRepositoryFile, writeRepositoryFile } from "../../../editor/github-mount";
 import type { GameProject } from "../../../editor/project-types";
+import { builtInSprites, builtInSyracuseScene } from "../../../editor/builtin-sprites";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,15 @@ function upgradeProject(project: GameProject): GameProject {
         { id: `${level.id}-entities`, levelId: level.id, name: "Entities", kind: "entities", visible: true, locked: false, opacity: 1 },
       );
     }
+    if (level.id === "syracuse-salt-yard" && !project.levelObjects.some((object) => object.levelId === level.id)) {
+      const levelLayers = project.levelLayers.filter((layer) => layer.levelId === level.id);
+      const objectLayer = levelLayers.find((layer) => layer.kind === "objects") || levelLayers[0];
+      const entityLayer = levelLayers.find((layer) => layer.kind === "entities") || objectLayer;
+      if (objectLayer && entityLayer) project.levelObjects.push(...builtInSyracuseScene(objectLayer.id, entityLayer.id));
+    }
   }
+  const knownSpriteIds = new Set(project.spriteAssets.map((asset) => asset.id));
+  project.spriteAssets.push(...builtInSprites().filter((asset) => !knownSpriteIds.has(asset.id)));
   return project;
 }
 
