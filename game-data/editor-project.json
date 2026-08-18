@@ -1,0 +1,2853 @@
+{
+  "schemaVersion": 1,
+  "game": "Life is a Gamble",
+  "updatedAt": "2026-08-18T13:07:04.553Z",
+  "levels": [
+    {
+      "id": "syracuse-salt-yard",
+      "name": "Syracuse · Salt Yard",
+      "region": "Upstate Wastes",
+      "description": "A dense downtown approach built around Clinton Square and the old canal corridor.",
+      "environment": "ruined-city-dusk",
+      "width": 100,
+      "height": 100,
+      "gridSize": 10,
+      "playerSpawn": {
+        "x": 50,
+        "y": 72
+      }
+    }
+  ],
+  "cells": [
+    {
+      "id": "clinton-square",
+      "levelId": "syracuse-salt-yard",
+      "name": "Clinton Square",
+      "kind": "exterior",
+      "x": 8,
+      "y": 45,
+      "width": 42,
+      "height": 38,
+      "ambience": "salt-wind",
+      "notes": "Primary arrival cell and Rowan encounter space.",
+      "doors": [
+        {
+          "id": "supply-door",
+          "name": "Clinton Provisioners",
+          "edge": "north",
+          "targetLevelId": "syracuse-salt-yard",
+          "targetCellId": "provisioners-interior",
+          "loadMode": "locked",
+          "locked": true,
+          "keyId": "provisioners-key"
+        }
+      ]
+    },
+    {
+      "id": "provisioners-interior",
+      "levelId": "syracuse-salt-yard",
+      "name": "Clinton Provisioners",
+      "kind": "interior",
+      "x": 58,
+      "y": 8,
+      "width": 30,
+      "height": 28,
+      "ambience": "interior-dust",
+      "notes": "Locked shop interior with searchable stock cage.",
+      "doors": []
+    }
+  ],
+  "spriteAssets": [
+    {
+      "id": "builtin-storefront-armory-storage",
+      "name": "Armory Storage",
+      "path": "public/storefronts/armory-storage.png",
+      "width": 469,
+      "height": 437,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-clinton-house",
+      "name": "Clinton House",
+      "path": "public/storefronts/clinton-house.png",
+      "width": 506,
+      "height": 888,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-clinton-provisioners",
+      "name": "Clinton Provisioners",
+      "path": "public/storefronts/clinton-provisioners.png",
+      "width": 489,
+      "height": 436,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-empire-rooms",
+      "name": "Empire Rooms",
+      "path": "public/storefronts/empire-rooms.png",
+      "width": 477,
+      "height": 436,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-hanover-row",
+      "name": "Hanover Row",
+      "path": "public/storefronts/hanover-row.png",
+      "width": 536,
+      "height": 893,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-onondaga-trust",
+      "name": "Onondaga Trust",
+      "path": "public/storefronts/onondaga-trust.png",
+      "width": 472,
+      "height": 439,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-salina-market",
+      "name": "Salina Market",
+      "path": "public/storefronts/salina-market.png",
+      "width": 471,
+      "height": 436,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-salt-city-foundry",
+      "name": "Salt City Foundry",
+      "path": "public/storefronts/salt-city-foundry.png",
+      "width": 467,
+      "height": 436,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-storefront-saltworks-exchange",
+      "name": "Saltworks Exchange",
+      "path": "public/storefronts/saltworks-exchange.png",
+      "width": 504,
+      "height": 874,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-landmark-erie-canal-museum",
+      "name": "Erie Canal Museum",
+      "path": "public/landmarks/erie-canal-museum.png",
+      "width": 525,
+      "height": 465,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-landmark-landmark-theatre",
+      "name": "Landmark Theatre",
+      "path": "public/landmarks/landmark-theatre.png",
+      "width": 517,
+      "height": 629,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-landmark-syracuse-city-hall",
+      "name": "Syracuse City Hall",
+      "path": "public/landmarks/syracuse-city-hall.png",
+      "width": 536,
+      "height": 914,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "building"
+      ],
+      "builtIn": true
+    },
+    {
+      "id": "builtin-character-v2-0",
+      "name": "Courier combat frame 1",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-v2-1",
+      "name": "Courier combat frame 2",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-v2-2",
+      "name": "Courier combat frame 3",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-v2-3",
+      "name": "Courier combat frame 4",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 3,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-v2-4",
+      "name": "Courier combat frame 5",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 4,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-v2-5",
+      "name": "Rabid squirrel frame 1",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-v2-6",
+      "name": "Rabid squirrel frame 2",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-v2-7",
+      "name": "Rabid squirrel frame 3",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-v2-8",
+      "name": "Rabid squirrel frame 4",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 3,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-v2-9",
+      "name": "Rabid squirrel frame 5",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 4,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-v2-10",
+      "name": "Rowan Vale frame 1",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 0,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-v2-11",
+      "name": "Rowan Vale frame 2",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 1,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-v2-12",
+      "name": "Rowan Vale frame 3",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 2,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-v2-13",
+      "name": "Rowan Vale frame 4",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 3,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-v2-14",
+      "name": "Rowan Vale frame 5",
+      "path": "public/life-is-a-gamble-sprite-atlas-v2.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "current"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 4,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-legacy-0",
+      "name": "Courier combat frame 1 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-legacy-1",
+      "name": "Courier combat frame 2 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-legacy-2",
+      "name": "Courier combat frame 3 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-legacy-3",
+      "name": "Courier combat frame 4 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 3,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-legacy-4",
+      "name": "Courier combat frame 5 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 4,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-character-legacy-5",
+      "name": "Rabid squirrel frame 1 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-legacy-6",
+      "name": "Rabid squirrel frame 2 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-legacy-7",
+      "name": "Rabid squirrel frame 3 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-legacy-8",
+      "name": "Rabid squirrel frame 4 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 3,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-legacy-9",
+      "name": "Rabid squirrel frame 5 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 4,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-character-legacy-10",
+      "name": "Rowan Vale frame 1 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 0,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-legacy-11",
+      "name": "Rowan Vale frame 2 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 1,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-legacy-12",
+      "name": "Rowan Vale frame 3 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 2,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-legacy-13",
+      "name": "Rowan Vale frame 4 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 3,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-character-legacy-14",
+      "name": "Rowan Vale frame 5 · legacy",
+      "path": "public/life-is-a-gamble-sprite-atlas.png",
+      "width": 307,
+      "height": 341,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "character",
+        "legacy"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 5,
+        "rows": 3,
+        "column": 4,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-courier-motion-0",
+      "name": "Courier idle",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-courier-motion-1",
+      "name": "Courier ready",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-courier-motion-2",
+      "name": "Courier walk 1",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-courier-motion-3",
+      "name": "Courier walk 2",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 3,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-courier-motion-4",
+      "name": "Courier run 1",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-courier-motion-5",
+      "name": "Courier run 2",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-courier-motion-6",
+      "name": "Courier run 3",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-courier-motion-7",
+      "name": "Courier run 4",
+      "path": "public/courier-motion-atlas.png",
+      "width": 384,
+      "height": 512,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "courier",
+        "motion"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 2,
+        "column": 3,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-corpse-0",
+      "name": "Courier corpse",
+      "path": "public/character-corpse-atlas.png",
+      "width": 724,
+      "height": 724,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "corpse"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 1,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-corpse-1",
+      "name": "Rowan Vale corpse",
+      "path": "public/character-corpse-atlas.png",
+      "width": 724,
+      "height": 724,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "corpse"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 1,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-corpse-2",
+      "name": "Rabid squirrel corpse",
+      "path": "public/character-corpse-atlas.png",
+      "width": 724,
+      "height": 724,
+      "category": "character",
+      "tags": [
+        "built-in",
+        "corpse"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 1,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-0",
+      "name": "Rusted fire hydrant",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-1",
+      "name": "Abandoned payphone",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-2",
+      "name": "Dented postal mailbox",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-3",
+      "name": "Overflowing trash cans",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 3,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-4",
+      "name": "Abandoned newspaper box",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-5",
+      "name": "Rusted oil drums",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-6",
+      "name": "Broken park bench",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-7",
+      "name": "Overturned shopping cart",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 3,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-8",
+      "name": "Damaged traffic signal",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 0,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-9",
+      "name": "Stacked sandbags",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 1,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-10",
+      "name": "Leaning utility pole",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 2,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-decor-11",
+      "name": "Broken municipal sign",
+      "path": "public/syracuse-decor-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "decor"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 3,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-0",
+      "name": "Syracuse environment tile 1",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-1",
+      "name": "Syracuse environment tile 2",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-2",
+      "name": "Syracuse environment tile 3",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-3",
+      "name": "Interior brick floor",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 3,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-4",
+      "name": "Interior brick wall",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-5",
+      "name": "Syracuse environment tile 6",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-6",
+      "name": "Syracuse environment tile 7",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-7",
+      "name": "Syracuse environment tile 8",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 3,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-8",
+      "name": "Syracuse environment tile 9",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 0,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-9",
+      "name": "Syracuse environment tile 10",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 1,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-10",
+      "name": "Interior scrap counter",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 2,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-11",
+      "name": "Syracuse environment tile 12",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 3,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-12",
+      "name": "Syracuse environment tile 13",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 0,
+        "row": 3
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-13",
+      "name": "Syracuse environment tile 14",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 1,
+        "row": 3
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-14",
+      "name": "Syracuse environment tile 15",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 2,
+        "row": 3
+      }
+    },
+    {
+      "id": "builtin-syracuse-environment-15",
+      "name": "Syracuse environment tile 16",
+      "path": "public/syracuse-environment-atlas.png",
+      "width": 314,
+      "height": 314,
+      "category": "terrain",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "environment"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 4,
+        "column": 3,
+        "row": 3
+      }
+    },
+    {
+      "id": "builtin-syracuse-landmark-0",
+      "name": "Rusted abandoned sedan",
+      "path": "public/syracuse-landmark-atlas.png",
+      "width": 627,
+      "height": 627,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "landmark"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 2,
+        "rows": 2,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-landmark-1",
+      "name": "Bent street lamp",
+      "path": "public/syracuse-landmark-atlas.png",
+      "width": 627,
+      "height": 627,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "landmark"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 2,
+        "rows": 2,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-syracuse-landmark-2",
+      "name": "Scrap checkpoint barricade",
+      "path": "public/syracuse-landmark-atlas.png",
+      "width": 627,
+      "height": 627,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "landmark"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 2,
+        "rows": 2,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-syracuse-landmark-3",
+      "name": "Dead tree planter",
+      "path": "public/syracuse-landmark-atlas.png",
+      "width": 627,
+      "height": 627,
+      "category": "prop",
+      "tags": [
+        "built-in",
+        "syracuse",
+        "landmark"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 2,
+        "rows": 2,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-modular-building-0",
+      "name": "Brick wall tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-modular-building-1",
+      "name": "Brick window tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-modular-building-2",
+      "name": "Brick door tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-modular-building-3",
+      "name": "Brick cornice tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 3,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-modular-building-4",
+      "name": "Stone wall tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-modular-building-5",
+      "name": "Stone window tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-modular-building-6",
+      "name": "Stone door tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-modular-building-7",
+      "name": "Stone cornice tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 3,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-modular-building-8",
+      "name": "Metal wall tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 0,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-modular-building-9",
+      "name": "Metal window tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 1,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-modular-building-10",
+      "name": "Roof tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 2,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-modular-building-11",
+      "name": "Damaged roof tile",
+      "path": "public/modular-building-atlas.png",
+      "width": 362,
+      "height": 362,
+      "category": "structure",
+      "tags": [
+        "built-in",
+        "building",
+        "tile"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 4,
+        "rows": 3,
+        "column": 3,
+        "row": 2
+      }
+    },
+    {
+      "id": "builtin-hud-material-0",
+      "name": "Dark steel panel",
+      "path": "public/hud-material-atlas.png",
+      "width": 512,
+      "height": 512,
+      "category": "effect",
+      "tags": [
+        "built-in",
+        "interface",
+        "material"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 2,
+        "column": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-hud-material-1",
+      "name": "Worn brass panel",
+      "path": "public/hud-material-atlas.png",
+      "width": 512,
+      "height": 512,
+      "category": "effect",
+      "tags": [
+        "built-in",
+        "interface",
+        "material"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 2,
+        "column": 1,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-hud-material-2",
+      "name": "Field terminal panel",
+      "path": "public/hud-material-atlas.png",
+      "width": 512,
+      "height": 512,
+      "category": "effect",
+      "tags": [
+        "built-in",
+        "interface",
+        "material"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 2,
+        "column": 2,
+        "row": 0
+      }
+    },
+    {
+      "id": "builtin-hud-material-3",
+      "name": "Amber control panel",
+      "path": "public/hud-material-atlas.png",
+      "width": 512,
+      "height": 512,
+      "category": "effect",
+      "tags": [
+        "built-in",
+        "interface",
+        "material"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 2,
+        "column": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-hud-material-4",
+      "name": "Radio display panel",
+      "path": "public/hud-material-atlas.png",
+      "width": 512,
+      "height": 512,
+      "category": "effect",
+      "tags": [
+        "built-in",
+        "interface",
+        "material"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 2,
+        "column": 1,
+        "row": 1
+      }
+    },
+    {
+      "id": "builtin-hud-material-5",
+      "name": "Olive equipment panel",
+      "path": "public/hud-material-atlas.png",
+      "width": 512,
+      "height": 512,
+      "category": "effect",
+      "tags": [
+        "built-in",
+        "interface",
+        "material"
+      ],
+      "builtIn": true,
+      "frame": {
+        "columns": 3,
+        "rows": 2,
+        "column": 2,
+        "row": 1
+      }
+    }
+  ],
+  "levelLayers": [
+    {
+      "id": "syracuse-terrain",
+      "levelId": "syracuse-salt-yard",
+      "name": "Terrain",
+      "kind": "terrain",
+      "visible": true,
+      "locked": false,
+      "opacity": 1
+    },
+    {
+      "id": "syracuse-objects",
+      "levelId": "syracuse-salt-yard",
+      "name": "Objects",
+      "kind": "objects",
+      "visible": true,
+      "locked": false,
+      "opacity": 1
+    },
+    {
+      "id": "syracuse-collision",
+      "levelId": "syracuse-salt-yard",
+      "name": "Collision",
+      "kind": "collision",
+      "visible": true,
+      "locked": false,
+      "opacity": 0.65
+    },
+    {
+      "id": "syracuse-entities",
+      "levelId": "syracuse-salt-yard",
+      "name": "Entities",
+      "kind": "entities",
+      "visible": true,
+      "locked": false,
+      "opacity": 1
+    }
+  ],
+  "levelObjects": [
+    {
+      "id": "scene-onondaga-trust",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "onondaga trust",
+      "spriteId": "builtin-storefront-onondaga-trust",
+      "x": 2,
+      "y": 4,
+      "width": 11,
+      "height": 17,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-erie-canal-museum",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "erie canal museum",
+      "spriteId": "builtin-landmark-erie-canal-museum",
+      "x": 13,
+      "y": 4,
+      "width": 12,
+      "height": 17,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-clinton-provisioners",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "clinton provisioners",
+      "spriteId": "builtin-storefront-clinton-provisioners",
+      "x": 26,
+      "y": 5,
+      "width": 11,
+      "height": 16,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-salina-market",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "salina market",
+      "spriteId": "builtin-storefront-salina-market",
+      "x": 38,
+      "y": 5,
+      "width": 11,
+      "height": 16,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-empire-rooms",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "empire rooms",
+      "spriteId": "builtin-storefront-empire-rooms",
+      "x": 50,
+      "y": 4,
+      "width": 10,
+      "height": 17,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-clinton-house",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "clinton house",
+      "spriteId": "builtin-storefront-clinton-house",
+      "x": 61,
+      "y": 2,
+      "width": 10,
+      "height": 20,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-syracuse-city-hall",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "syracuse city hall",
+      "spriteId": "builtin-landmark-syracuse-city-hall",
+      "x": 72,
+      "y": 1,
+      "width": 11,
+      "height": 21,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-salt-city-foundry",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "salt city foundry",
+      "spriteId": "builtin-storefront-salt-city-foundry",
+      "x": 84,
+      "y": 5,
+      "width": 12,
+      "height": 16,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-landmark-theatre",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Landmark Theatre",
+      "spriteId": "builtin-landmark-landmark-theatre",
+      "x": 4,
+      "y": 73,
+      "width": 13,
+      "height": 22,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-armory-storage",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Armory Storage",
+      "spriteId": "builtin-storefront-armory-storage",
+      "x": 18,
+      "y": 77,
+      "width": 12,
+      "height": 17,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-hanover-row",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Hanover Row",
+      "spriteId": "builtin-storefront-hanover-row",
+      "x": 72,
+      "y": 75,
+      "width": 11,
+      "height": 21,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-saltworks-exchange",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Saltworks Exchange",
+      "spriteId": "builtin-storefront-saltworks-exchange",
+      "x": 85,
+      "y": 74,
+      "width": 11,
+      "height": 22,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-car",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Rusted abandoned sedan",
+      "spriteId": "builtin-syracuse-landmark-0",
+      "x": 28,
+      "y": 48,
+      "width": 8,
+      "height": 7,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-lamp",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Bent street lamp",
+      "spriteId": "builtin-syracuse-landmark-1",
+      "x": 68,
+      "y": 43,
+      "width": 4,
+      "height": 9,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-barricade",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Scrap checkpoint barricade",
+      "spriteId": "builtin-syracuse-landmark-2",
+      "x": 51,
+      "y": 58,
+      "width": 10,
+      "height": 6,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-tree",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Dead tree planter",
+      "spriteId": "builtin-syracuse-landmark-3",
+      "x": 88,
+      "y": 56,
+      "width": 6,
+      "height": 10,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-hydrant",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Rusted fire hydrant",
+      "spriteId": "builtin-syracuse-decor-0",
+      "x": 41,
+      "y": 53,
+      "width": 3,
+      "height": 4,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-payphone",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Abandoned payphone",
+      "spriteId": "builtin-syracuse-decor-1",
+      "x": 6,
+      "y": 54,
+      "width": 4,
+      "height": 7,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-mailbox",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Dented postal mailbox",
+      "spriteId": "builtin-syracuse-decor-2",
+      "x": 64,
+      "y": 52,
+      "width": 4,
+      "height": 5,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-barrels",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Rusted oil drums",
+      "spriteId": "builtin-syracuse-decor-5",
+      "x": 47,
+      "y": 82,
+      "width": 6,
+      "height": 6,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-bench",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Broken park bench",
+      "spriteId": "builtin-syracuse-decor-6",
+      "x": 21,
+      "y": 52,
+      "width": 8,
+      "height": 5,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-sandbags",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-objects",
+      "name": "Stacked sandbags",
+      "spriteId": "builtin-syracuse-decor-9",
+      "x": 56,
+      "y": 81,
+      "width": 8,
+      "height": 5,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": true,
+        "shape": "rectangle",
+        "solid": true,
+        "trigger": false,
+        "tag": "building"
+      }
+    },
+    {
+      "id": "scene-courier",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-entities",
+      "name": "The Courier",
+      "spriteId": "builtin-courier-motion-1",
+      "x": 47,
+      "y": 66,
+      "width": 7,
+      "height": 10,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": false,
+        "shape": "rectangle",
+        "solid": false,
+        "trigger": false,
+        "tag": ""
+      }
+    },
+    {
+      "id": "scene-rowan",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-entities",
+      "name": "Rowan Vale",
+      "spriteId": "builtin-character-v2-10",
+      "x": 35,
+      "y": 65,
+      "width": 7,
+      "height": 10,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": false,
+        "shape": "rectangle",
+        "solid": false,
+        "trigger": false,
+        "tag": ""
+      }
+    },
+    {
+      "id": "scene-squirrel",
+      "levelId": "syracuse-salt-yard",
+      "layerId": "syracuse-entities",
+      "name": "Rabid squirrel",
+      "spriteId": "builtin-character-v2-5",
+      "x": 68.24574961360125,
+      "y": 59.99072642967543,
+      "width": 6,
+      "height": 7,
+      "rotation": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "flipX": false,
+      "flipY": false,
+      "tint": "#ffffff",
+      "collision": {
+        "enabled": false,
+        "shape": "rectangle",
+        "solid": false,
+        "trigger": false,
+        "tag": ""
+      }
+    }
+  ],
+  "lootTables": [
+    {
+      "id": "street-cache-common",
+      "name": "Street Cache · Common",
+      "rolls": 2,
+      "allowDuplicates": false,
+      "entries": [
+        {
+          "id": "loot-chips",
+          "itemId": "old-chips",
+          "itemName": "Old-world Chips",
+          "chance": 72,
+          "weight": 50,
+          "min": 2,
+          "max": 9,
+          "condition": ""
+        },
+        {
+          "id": "loot-bandage",
+          "itemId": "field-bandage",
+          "itemName": "Field Bandage",
+          "chance": 35,
+          "weight": 25,
+          "min": 1,
+          "max": 2,
+          "condition": "player.level >= 1"
+        }
+      ]
+    }
+  ],
+  "npcs": [
+    {
+      "id": "rowan-vale",
+      "name": "Rowan Vale",
+      "role": "Wanderer / potential companion",
+      "faction": "Independent",
+      "hostile": false,
+      "level": 4,
+      "health": 28,
+      "armor": 3,
+      "personality": "Wary, dryly funny, practical, private, and slow to trust.",
+      "dialogueStyle": "Short, observant sentences. Deflects with questions when motives are unclear.",
+      "motivation": "Map a survivable western route without owing Albany a favor.",
+      "fears": "Becoming responsible for another doomed traveler.",
+      "traits": [
+        "candor-sensitive",
+        "cartographer",
+        "slow-trust"
+      ],
+      "likes": [
+        "maps",
+        "coffee",
+        "competence"
+      ],
+      "dislikes": [
+        "threats",
+        "Citadel clerks",
+        "empty heroics"
+      ],
+      "inventoryLootTableId": "street-cache-common",
+      "dropLootTableId": "street-cache-common"
+    },
+    {
+      "id": "rabid-squirrel",
+      "name": "Rabid Squirrel",
+      "role": "Wildlife threat",
+      "faction": "Feral",
+      "hostile": true,
+      "level": 1,
+      "health": 12,
+      "armor": 0,
+      "personality": "Territorial, frantic, hunger-driven.",
+      "dialogueStyle": "Nonverbal.",
+      "motivation": "Defend its nest and feed.",
+      "fears": "Fire and sustained noise.",
+      "traits": [
+        "fast",
+        "feral",
+        "disease-carrier"
+      ],
+      "likes": [],
+      "dislikes": [
+        "fire",
+        "noise"
+      ],
+      "inventoryLootTableId": "",
+      "dropLootTableId": "street-cache-common"
+    }
+  ],
+  "spawners": [
+    {
+      "id": "squirrel-alley-spawner",
+      "name": "Squirrel Alley",
+      "levelId": "syracuse-salt-yard",
+      "cellId": "clinton-square",
+      "x": 75,
+      "y": 65,
+      "radius": 8,
+      "maxAlive": 2,
+      "cooldownSeconds": 90,
+      "enabled": true,
+      "entries": [
+        {
+          "id": "spawn-rabid-squirrel",
+          "npcId": "rabid-squirrel",
+          "chance": 65,
+          "weight": 100,
+          "minGroup": 1,
+          "maxGroup": 2
+        }
+      ]
+    }
+  ],
+  "quests": [
+    {
+      "id": "courthouse-ledger",
+      "title": "The Courthouse Ledger",
+      "summary": "Follow Rowan's rumor to a pre-Silence ledger beneath the courthouse.",
+      "giverNpcId": "rowan-vale",
+      "repeatable": false,
+      "hidden": false,
+      "triggers": [
+        {
+          "id": "trigger-rowan-rumor",
+          "type": "world_flag",
+          "targetId": "Rumor unlocked: The Courthouse Ledger",
+          "operator": "is",
+          "value": "true"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task-enter-courthouse",
+          "title": "Reach the courthouse undercroft",
+          "type": "visit",
+          "targetId": "courthouse-undercroft",
+          "count": 1,
+          "optional": false
+        },
+        {
+          "id": "task-find-ledger",
+          "title": "Recover the continuity ledger",
+          "type": "collect",
+          "targetId": "continuity-ledger",
+          "count": 1,
+          "optional": false
+        }
+      ],
+      "completionMode": "all_required",
+      "completionRequirements": "The Courier possesses continuity-ledger and has not surrendered it to another faction.",
+      "rewards": [
+        {
+          "id": "reward-ledger-xp",
+          "type": "xp",
+          "targetId": "player",
+          "amount": 80
+        },
+        {
+          "id": "reward-ledger-flag",
+          "type": "world_flag",
+          "targetId": "Ledger recovered",
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}
