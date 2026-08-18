@@ -41,6 +41,8 @@ test("server-renders the Life is a Gamble game shell", async () => {
   assert.match(html, /<title>Life is a Gamble/);
   assert.match(html, /NEW GAME/);
   assert.match(html, /LOAD GAME/);
+  assert.match(html, /SELECT DEPLOYMENT/);
+  assert.doesNotMatch(html, /WAKE THE RADIO|RESTART TITLE SIGNAL|RADIO DORMANT/);
   assert.match(html, /DOWNTOWN SYRACUSE/);
   assert.match(html, /FATE ENGINE/);
   assert.match(html, /slot-machine/);
@@ -85,12 +87,15 @@ test("uses authored storefront and Syracuse landmark sprites without losing door
 
   await Promise.all(assets.map((asset) => access(new URL(asset, import.meta.url))));
   assert.match(page, /building-facade-art/);
+  assert.doesNotMatch(page, /await audio\.activate\("menu"\)/);
   assert.match(page, /facade-door-hitbox/);
   assert.match(page, /facade-door-/);
   assert.match(page, /facade=\{\{ kind: "landmark", id: "syracuse-city-hall" \}\}/);
   assert.match(css, /\.building-facade-art\.storefront/);
   assert.doesNotMatch(page, /className=\{`building-sign/);
-  assert.match(css, /--facade-width:205px;--facade-height:350px/);
+  assert.match(css, /--facade-width:263px;--facade-height:500px/);
+  assert.match(css, /\.building-facade-art\.facade-syracuse-city-hall\{background-size:112% 100%/);
+  assert.match(css, /\.building-facade-art\.facade-landmark-theatre\{background-size:114% 100%/);
   assert.match(css, /\.streetwall-row \.has-facade \.building-cell \.building-tile/);
   assert.match(css, /\.facade-door-syracuse-city-hall/);
 });

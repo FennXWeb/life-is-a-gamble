@@ -867,7 +867,7 @@ export default function Home() {
     playtimeOffset.current = 0;
     playtimeStartedAt.current = Date.now();
     setHasActiveSave(true);
-    await audio.activate("menu");
+    void audio.activate("menu");
     audio.play("door");
     setMainMenu(false);
   };
@@ -1611,18 +1611,25 @@ export default function Home() {
       if (!mainMenu && target.closest("button")) audio.play("ui");
     }}>
       {mainMenu && <section className="main-menu" aria-label="Life is a Gamble main menu">
+        <div className="menu-sector-stamp" aria-hidden="true">
+          <span>FENNX CREATIVE</span>
+          <b>SYRACUSE<br/>EXCLUSION<br/>ZONE</b>
+          <i>EST. 2186</i>
+        </div>
         <div className="main-menu-card">
-          <small>100 YEARS AFTER THE FEDERAL SILENCE</small>
-          <h2>LIFE <i>IS A</i> GAMBLE</h2>
-          <p>Syracuse is awake. The radio is not.</p>
-          <div className={`radio-readout ${audio.ready ? "online" : ""}`}><b>{audio.ready ? "RADIO ONLINE · 89.7 WSTL" : "RADIO DORMANT"}</b><span>{audio.ready ? audio.musicStatus : "Activate audio to hear the title transmission"}</span></div>
-          <div className="main-menu-actions">
-            <button onClick={() => { void audio.activate("menu"); }}>{audio.ready ? "RESTART TITLE SIGNAL" : "WAKE THE RADIO"}</button>
-            <button className="enter-game" disabled={!hasActiveSave} onClick={async () => { await audio.activate("menu"); audio.play("door"); setMainMenu(false); }}>CONTINUE</button>
-            <button onClick={() => { void startNewGame(); }}>NEW GAME</button>
-            <button onClick={() => setPanel("saves")} disabled={!saveSlots.length}>LOAD GAME</button>
+          <div className="menu-classification"><span>100 YEARS AFTER THE FEDERAL SILENCE</span><b>FIELD TERMINAL // 01</b></div>
+          <div className="menu-title-lockup">
+            <small>A POST-FEDERAL ROLE-PLAYING GAME</small>
+            <h2>LIFE <i>IS A</i> GAMBLE</h2>
+            <p>Luck is the last law left standing.</p>
           </div>
-          <em>F5 QUICK SAVE · F9 QUICK LOAD · ESC PAUSE MENU</em>
+          <div className="menu-divider"><i/><span>SELECT DEPLOYMENT</span><i/></div>
+          <div className="main-menu-actions">
+            <button className="enter-game" disabled={!hasActiveSave} onClick={() => { void audio.activate("menu"); audio.play("door"); setMainMenu(false); }}><span>CONTINUE</span><small>Return to the Syracuse ruins</small></button>
+            <button onClick={() => { void startNewGame(); }}><span>NEW GAME</span><small>Begin a new wager</small></button>
+            <button onClick={() => setPanel("saves")} disabled={!saveSlots.length}><span>LOAD GAME</span><small>Open the save archive</small></button>
+          </div>
+          <div className="menu-footer"><span>SYRACUSE, NEW YORK // 2186</span><em>F5 QUICK SAVE · F9 QUICK LOAD · ESC PAUSE</em></div>
         </div>
       </section>}
       <header className="topbar">
