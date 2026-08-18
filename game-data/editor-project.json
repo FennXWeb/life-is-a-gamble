@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "game": "Life is a Gamble",
-  "updatedAt": "2026-08-18T13:07:04.553Z",
+  "updatedAt": "2026-08-18T13:08:13.302Z",
   "levels": [
     {
       "id": "syracuse-salt-yard",
@@ -2641,8 +2641,8 @@
       "layerId": "syracuse-entities",
       "name": "Rowan Vale",
       "spriteId": "builtin-character-v2-10",
-      "x": 35,
-      "y": 65,
+      "x": 92.57341576506954,
+      "y": 54.02627511591963,
       "width": 7,
       "height": 10,
       "rotation": 0,
