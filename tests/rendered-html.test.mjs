@@ -123,6 +123,9 @@ test("dead characters leave persistent lootable corpses and live dialogue uses t
   assert.match(transcription, /\/v1\/audio\/transcriptions/);
   assert.match(css, /character-corpse-atlas\.png/);
   assert.match(css, /\.live-toggle/);
+  assert.match(css, /Atlas safety gutters/);
+  assert.match(css, /\.decor-sprite::before\{[^}]*inset:4% 5% 6%/);
+  assert.match(css, /\.sprite::before\{[^}]*life-is-a-gamble-sprite-atlas-v2\.png/);
 });
 
 test("dialogue can create validated quests and recruit a companion", async () => {

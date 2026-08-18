@@ -562,3 +562,14 @@ kbd { background:#d2c4a4; color:#201b14; padding:2px 5px; margin-left:15px; }
 .facade-door-syracuse-city-hall{--door-left:36%;--door-width:25%;--door-height:18%;--door-bottom:1%}.facade-door-landmark-theatre{--door-left:26%;--door-width:43%;--door-height:18%;--door-bottom:1%}.facade-door-hanover-row{--door-left:62%;--door-width:30%;--door-height:24%;--door-bottom:5%}
 @media(max-width:1250px){.main-menu{padding-left:5vw}.main-menu-card{width:min(610px,72vw);padding:0 0 23px}.menu-sector-stamp{opacity:.55}.menu-title-lockup h2{font-size:52px}.streetwall-row{left:50%;right:auto;width:3313px;min-width:3313px;transform:translateX(-50%);transform-origin:center bottom}}
 @media(max-width:760px){.main-menu{padding:22px}.main-menu-card{width:100%}.menu-sector-stamp{display:none}.menu-title-lockup{padding:28px 25px 20px}.menu-title-lockup h2{font-size:42px}.menu-classification{padding-left:20px;padding-right:20px}.menu-classification b{display:none}.main-menu-actions{padding:0 22px}.menu-footer{padding-left:22px;padding-right:22px;flex-direction:column}.menu-footer em{text-align:left}}
+
+/* Atlas safety gutters: generated art often reaches a cell edge, so paint each frame inside its world box. */
+.sprite,.courier-motion-sprite,.decor-sprite,.landmark-sprite,.corpse-sprite{background-image:none!important;overflow:visible}
+.sprite{position:relative}
+.sprite::before,.courier-motion-sprite::before,.decor-sprite::before,.landmark-sprite::before,.corpse-sprite::before{content:"";position:absolute;pointer-events:none;background-size:inherit;background-position:inherit;background-repeat:no-repeat;background-color:transparent}
+.sprite::before{inset:3% 4% 5%;background-image:url('/life-is-a-gamble-sprite-atlas-v2.png')}
+.courier-motion-sprite::before{inset:2% 3% 4%;background-image:url('/courier-motion-atlas.png')}
+.decor-sprite::before{inset:4% 5% 6%;background-image:url('/syracuse-decor-atlas.png')}
+.landmark-sprite::before{inset:3% 4% 5%;background-image:url('/syracuse-landmark-atlas.png')}
+.corpse-sprite::before{inset:3% 4% 5%;background-image:url('/character-corpse-atlas.png')}
+.downtown-player,.downtown-rowan,.downtown-squirrel,.npc-actor,.corpse-actor,.hotspot.prop,.landmark-sprite.city-prop{overflow:visible}
