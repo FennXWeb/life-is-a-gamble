@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "game": "Life is a Gamble",
-  "updatedAt": "2026-08-18T13:08:13.302Z",
+  "updatedAt": "2026-08-23T20:30:35.639Z",
   "levels": [
     {
       "id": "syracuse-salt-yard",
@@ -18,45 +18,7 @@
       }
     }
   ],
-  "cells": [
-    {
-      "id": "clinton-square",
-      "levelId": "syracuse-salt-yard",
-      "name": "Clinton Square",
-      "kind": "exterior",
-      "x": 8,
-      "y": 45,
-      "width": 42,
-      "height": 38,
-      "ambience": "salt-wind",
-      "notes": "Primary arrival cell and Rowan encounter space.",
-      "doors": [
-        {
-          "id": "supply-door",
-          "name": "Clinton Provisioners",
-          "edge": "north",
-          "targetLevelId": "syracuse-salt-yard",
-          "targetCellId": "provisioners-interior",
-          "loadMode": "locked",
-          "locked": true,
-          "keyId": "provisioners-key"
-        }
-      ]
-    },
-    {
-      "id": "provisioners-interior",
-      "levelId": "syracuse-salt-yard",
-      "name": "Clinton Provisioners",
-      "kind": "interior",
-      "x": 58,
-      "y": 8,
-      "width": 30,
-      "height": 28,
-      "ambience": "interior-dust",
-      "notes": "Locked shop interior with searchable stock cage.",
-      "doors": []
-    }
-  ],
+  "cells": [],
   "spriteAssets": [
     {
       "id": "builtin-storefront-armory-storage",
@@ -2233,10 +2195,10 @@
       "layerId": "syracuse-objects",
       "name": "syracuse city hall",
       "spriteId": "builtin-landmark-syracuse-city-hall",
-      "x": 72,
-      "y": 1,
-      "width": 11,
-      "height": 21,
+      "x": 0,
+      "y": 27.666151468315306,
+      "width": 38,
+      "height": 67,
       "rotation": 0,
       "scaleX": 1,
       "scaleY": 1,
@@ -2257,10 +2219,10 @@
       "layerId": "syracuse-objects",
       "name": "salt city foundry",
       "spriteId": "builtin-storefront-salt-city-foundry",
-      "x": 84,
-      "y": 5,
-      "width": 12,
-      "height": 16,
+      "x": 75,
+      "y": 19.173106646058727,
+      "width": 25,
+      "height": 25,
       "rotation": 0,
       "scaleX": 1,
       "scaleY": 1,
@@ -2281,8 +2243,8 @@
       "layerId": "syracuse-objects",
       "name": "Landmark Theatre",
       "spriteId": "builtin-landmark-landmark-theatre",
-      "x": 4,
-      "y": 73,
+      "x": 27.724884080370945,
+      "y": 15.890262751159199,
       "width": 13,
       "height": 22,
       "rotation": 0,
@@ -2305,8 +2267,8 @@
       "layerId": "syracuse-objects",
       "name": "Armory Storage",
       "spriteId": "builtin-storefront-armory-storage",
-      "x": 18,
-      "y": 77,
+      "x": 61.27666151468315,
+      "y": 25.068006182380216,
       "width": 12,
       "height": 17,
       "rotation": 0,
@@ -2617,8 +2579,8 @@
       "layerId": "syracuse-entities",
       "name": "The Courier",
       "spriteId": "builtin-courier-motion-1",
-      "x": 47,
-      "y": 66,
+      "x": 63.46058732612055,
+      "y": 71.95054095826893,
       "width": 7,
       "height": 10,
       "rotation": 0,
@@ -2642,7 +2604,7 @@
       "name": "Rowan Vale",
       "spriteId": "builtin-character-v2-10",
       "x": 92.57341576506954,
-      "y": 54.02627511591963,
+      "y": 44.02627511591963,
       "width": 7,
       "height": 10,
       "rotation": 0,
